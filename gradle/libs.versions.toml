@@ -16,4 +16,4 @@ edc-bom-dataplane-sql = { module = "org.eclipse.edc:dataplane-feature-sql-bom", 
 
 [plugins]
 shadow = { id = "com.github.johnrengelman.shadow", version = "8.1.1" }
-docker = { id = "com.bmuschko.docker-remote-api", version = "9.4.0" }
+docker = { id = "com.bmuschko.docker-remote-api", version = "10.0.0" }
