@@ -1,0 +1,95 @@
+services:
+  provider-controlplane:
+    image: puerto-edc-controlplane:latest
+    container_name: provider-controlplane
+    ports:
+      - "19193:19193"
+      - "19291:19291"
+      - "19292:19292"
+      - "19194:19194"
+    environment:
+      EDC_PARTICIPANT_ID: regulatory-clearance-provider
+      EDC_IAM_ISSUER_ID: regulatory-clearance-provider
+      EDC_IAM_STS_OAUTH_TOKEN_URL: http://host.docker.internal:8080/realms/logistics-dataspace/protocol/openid-connect/token
+      EDC_IAM_STS_OAUTH_CLIENT_ID: edc-provider-controlplane
+      EDC_IAM_STS_OAUTH_CLIENT_SECRET_ALIAS: edc-provider-controlplane-secret
+      EDC_HOSTNAME: provider-controlplane
+      WEB_HTTP_PORT: 19191
+      WEB_HTTP_PATH: /api
+      WEB_HTTP_MANAGEMENT_PORT: 19193
+      WEB_HTTP_MANAGEMENT_PATH: /management
+      WEB_HTTP_MANAGEMENT_AUTH_KEY: provider-api-key
+      WEB_HTTP_PROTOCOL_PORT: 19292
+      WEB_HTTP_PROTOCOL_PATH: /protocol
+      WEB_HTTP_CONTROL_PORT: 19194
+      WEB_HTTP_CONTROL_PATH: /control
+      EDC_DSP_CALLBACK_ADDRESS: http://provider-controlplane:19292/protocol
+
+  provider-dataplane:
+    image: puerto-edc-dataplane:latest
+    container_name: provider-dataplane
+    ports:
+      - "19294:19294"
+    environment:
+      EDC_PARTICIPANT_ID: regulatory-clearance-provider
+      EDC_TRANSFER_PROXY_TOKEN_SIGNER_PRIVATEKEY_ALIAS: private-key
+      EDC_TRANSFER_PROXY_TOKEN_VERIFIER_PUBLICKEY_ALIAS: public-key
+      EDC_DPF_SELECTOR_URL: http://provider-controlplane:19194/control/v1/dataplanes
+      EDC_HOSTNAME: provider-dataplane
+      EDC_DATAPLANE_API_PUBLIC_BASEURL: http://provider-dataplane:19294/public
+      WEB_HTTP_PORT: 19291
+      WEB_HTTP_PATH: /api
+      WEB_HTTP_CONTROL_PORT: 19292
+      WEB_HTTP_CONTROL_PATH: /control
+      WEB_HTTP_PUBLIC_PORT: 19294
+      WEB_HTTP_PUBLIC_PATH: /public
+
+  consumer-controlplane:
+    image: puerto-edc-controlplane:latest
+    container_name: consumer-controlplane
+    ports:
+      - "29193:29193"
+      - "29292:29292"
+      - "29194:29194"
+    environment:
+      EDC_PARTICIPANT_ID: transport-company-a
+      EDC_IAM_ISSUER_ID: transport-company-a
+      EDC_IAM_STS_OAUTH_TOKEN_URL: http://host.docker.internal:8080/realms/logistics-dataspace/protocol/openid-connect/token
+      EDC_IAM_STS_OAUTH_CLIENT_ID: edc-consumer-controlplane
+      EDC_IAM_STS_OAUTH_CLIENT_SECRET_ALIAS: edc-consumer-controlplane-secret
+      EDC_HOSTNAME: consumer-controlplane
+      WEB_HTTP_PORT: 29191
+      WEB_HTTP_PATH: /api
+      WEB_HTTP_MANAGEMENT_PORT: 29193
+      WEB_HTTP_MANAGEMENT_PATH: /management
+      WEB_HTTP_MANAGEMENT_AUTH_KEY: consumer-api-key
+      WEB_HTTP_PROTOCOL_PORT: 29292
+      WEB_HTTP_PROTOCOL_PATH: /protocol
+      WEB_HTTP_CONTROL_PORT: 29194
+      WEB_HTTP_CONTROL_PATH: /control
+      EDC_DSP_CALLBACK_ADDRESS: http://consumer-controlplane:29292/protocol
+
+  consumer-dataplane:
+    image: puerto-edc-dataplane:latest
+    container_name: consumer-dataplane
+    ports:
+      - "29294:29294"
+    environment:
+      EDC_PARTICIPANT_ID: transport-company-a
+      EDC_TRANSFER_PROXY_TOKEN_SIGNER_PRIVATEKEY_ALIAS: private-key
+      EDC_TRANSFER_PROXY_TOKEN_VERIFIER_PUBLICKEY_ALIAS: public-key
+      EDC_DPF_SELECTOR_URL: http://consumer-controlplane:29194/control/v1/dataplanes
+      EDC_HOSTNAME: consumer-dataplane
+      EDC_DATAPLANE_API_PUBLIC_BASEURL: http://consumer-dataplane:29294/public
+      WEB_HTTP_PORT: 29291
+      WEB_HTTP_PATH: /api
+      WEB_HTTP_CONTROL_PORT: 29292
+      WEB_HTTP_CONTROL_PATH: /control
+      WEB_HTTP_PUBLIC_PORT: 29294
+      WEB_HTTP_PUBLIC_PATH: /public
+
+  mock-api:
+    build: ./mock-api
+    container_name: regulatory-clearance-api
+    ports:
+      - "8081:8081"

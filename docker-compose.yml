@@ -1,6 +1,0 @@
-services:
-  mock-api:
-    build: ./mock-api
-    container_name: regulatory-clearance-api
-    ports:
-      - "8081:8081"
