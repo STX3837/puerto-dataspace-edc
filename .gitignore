@@ -52,3 +52,9 @@ launchers/demo-e2e/edc-config.properties
 .env
 runtime_settings.properties
 generated_backend.tf
+
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
