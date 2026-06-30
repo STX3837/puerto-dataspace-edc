@@ -1,0 +1,17 @@
+﻿{
+  "@context": {
+    "@vocab": "https://w3id.org/edc/v0.0.1/ns/"
+  },
+  "@id": "container-clearance-status",
+  "properties": {
+    "name": "Container Clearance Status",
+    "description": "Administrative aggregated clearance status for containers",
+    "contenttype": "application/json",
+    "domain": "port-logistics",
+    "assetType": "clearance-status"
+  },
+  "dataAddress": {
+    "type": "HttpData",
+    "baseUrl": "http://mock-api:8081/containers/MSCU1234567/clearance"
+  }
+}
