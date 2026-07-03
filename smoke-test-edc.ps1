@@ -5,14 +5,24 @@ $CONSUMER_KEY = "consumer-api-key"
 $PROVIDER_DID = "did:web:provider-identityhub%3A8183:provider"
 $ASSET_ID_EXPECTED = "asset-clearance-mscu7654321"
 
+$RESOURCES = Join-Path $PSScriptRoot "resources"
+$GENERATED = Join-Path $RESOURCES "generated"
+$CATALOG_REQUEST = Join-Path $RESOURCES "catalog\catalog-request.json"
+$CATALOG_RESPONSE = Join-Path $GENERATED "catalog-response.json"
+$NEGOTIATION_REQUEST = Join-Path $GENERATED "contract-negotiation-request.json"
+$TRANSFER_REQUEST = Join-Path $GENERATED "transfer-request.json"
+$EDR_RESPONSE = Join-Path $GENERATED "edr-response.json"
+
+New-Item -ItemType Directory -Path $GENERATED -Force | Out-Null
+
 Write-Host "1) Catalog..."
 curl.exe -s -X POST "$CONSUMER_MGMT/v3/catalog/request" `
   -H "X-API-Key: $CONSUMER_KEY" `
   -H "Content-Type: application/json" `
-  --data-binary "@catalog-request.json" `
-  -o catalog-response.json
+  --data-binary "@$CATALOG_REQUEST" `
+  -o $CATALOG_RESPONSE
 
-$catalog = Get-Content .\catalog-response.json -Raw | ConvertFrom-Json
+$catalog = Get-Content -LiteralPath $CATALOG_RESPONSE -Raw | ConvertFrom-Json
 $dataset = @($catalog.'dcat:dataset') | Where-Object { $_.'@id' -eq $ASSET_ID_EXPECTED } | Select-Object -First 1
 
 if (-not $dataset) { throw "Asset no encontrado en catálogo" }
@@ -60,7 +70,7 @@ Write-Host "2) Contract negotiation..."
     "odrl:obligation": []
   }
 }
-"@ | Set-Content .\contract-negotiation-request.json -Encoding utf8
+"@ | Set-Content -LiteralPath $NEGOTIATION_REQUEST -Encoding utf8
 
 $response = Invoke-WebRequest `
   -UseBasicParsing `
@@ -68,7 +78,7 @@ $response = Invoke-WebRequest `
   -Uri "$CONSUMER_MGMT/v3/contractnegotiations" `
   -Headers @{ "X-API-Key" = $CONSUMER_KEY } `
   -ContentType "application/json" `
-  -InFile ".\contract-negotiation-request.json"
+  -InFile $NEGOTIATION_REQUEST
 
 $NEGOTIATION_ID = ($response.Content | ConvertFrom-Json).'@id'
 
@@ -103,12 +113,9 @@ Write-Host "3) Transfer..."
   "protocol": "dataspace-protocol-http",
   "assetId": "$ASSET_ID",
   "contractId": "$AGREEMENT_ID",
-  "transferType": "HttpData-PULL",
-  "dataDestination": {
-    "type": "HttpProxy"
-  }
+  "transferType": "HttpData-PULL"
 }
-"@ | Set-Content .\transfer-request.json -Encoding utf8
+"@ | Set-Content -LiteralPath $TRANSFER_REQUEST -Encoding utf8
 
 $response = Invoke-WebRequest `
   -UseBasicParsing `
@@ -116,7 +123,7 @@ $response = Invoke-WebRequest `
   -Uri "$CONSUMER_MGMT/v3/transferprocesses" `
   -Headers @{ "X-API-Key" = $CONSUMER_KEY } `
   -ContentType "application/json" `
-  -InFile ".\transfer-request.json"
+  -InFile $TRANSFER_REQUEST
 
 $TRANSFER_ID = ($response.Content | ConvertFrom-Json).'@id'
 
@@ -145,7 +152,7 @@ $edr = Invoke-RestMethod `
   -Uri "$CONSUMER_MGMT/v3/edrs/$TRANSFER_ID/dataaddress" `
   -Headers @{ "X-API-Key" = $CONSUMER_KEY }
 
-$edr | ConvertTo-Json -Depth 20 | Set-Content .\edr-response.json -Encoding utf8
+$edr | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $EDR_RESPONSE -Encoding utf8
 
 $endpoint = $edr.endpoint `
   -replace "http://provider-dataplane:19294", "http://localhost:19294" `

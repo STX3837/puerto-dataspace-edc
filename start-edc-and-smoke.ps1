@@ -1,6 +1,12 @@
 ﻿$ErrorActionPreference = "Stop"
 
-cd "C:\Users\alberto.paleteiro\Desktop\Prácticas Alberto Paleteiro\Espacio de datos\puerto-dataspace-edc"
+Set-Location $PSScriptRoot
+
+$RESOURCES = Join-Path $PSScriptRoot "resources"
+$ASSET_DEMO = Join-Path $RESOURCES "assets\asset-clearance-mscu7654321.json"
+$POLICY_ALLOW_USE = Join-Path $RESOURCES "policies\policy-allow-use.json"
+$CONTRACT_DEMO = Join-Path $RESOURCES "contracts\contract-clearance-mscu7654321.json"
+$SMOKE_TEST = Join-Path $PSScriptRoot "smoke-test-edc.ps1"
 
 function Post-Json-Accept409($url, $apiKey, $file) {
   try {
@@ -53,9 +59,9 @@ Write-Host "VCs OK"
 
 Write-Host "4) Recargando asset, policy y contract definition..."
 
-Post-Json-Accept409 "http://localhost:19193/management/v3/assets" "provider-api-key" ".\asset-demo.json"
-Post-Json-Accept409 "http://localhost:19193/management/v3/policydefinitions" "provider-api-key" ".\policy-allow-use.json"
-Post-Json-Accept409 "http://localhost:19193/management/v3/contractdefinitions" "provider-api-key" ".\contract-demo.json"
+Post-Json-Accept409 "http://localhost:19193/management/v3/assets" "provider-api-key" $ASSET_DEMO
+Post-Json-Accept409 "http://localhost:19193/management/v3/policydefinitions" "provider-api-key" $POLICY_ALLOW_USE
+Post-Json-Accept409 "http://localhost:19193/management/v3/contractdefinitions" "provider-api-key" $CONTRACT_DEMO
 
 Write-Host "Provider artifacts OK"
 
@@ -71,6 +77,6 @@ Write-Host "DataPlane OK"
 
 Write-Host "6) Ejecutando smoke test extremo a extremo..."
 
-powershell.exe -ExecutionPolicy Bypass -File .\smoke-test-edc.ps1
+powershell.exe -ExecutionPolicy Bypass -File $SMOKE_TEST
 
 Write-Host "`nENTORNO VALIDADO"
