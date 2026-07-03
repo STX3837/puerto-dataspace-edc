@@ -58,3 +58,10 @@ generated_backend.tf
 *.crt
 *.p12
 *.jks
+
+edr-response.json
+catalog-response.json
+downloaded-clearance.json
+provider-last.log
+consumer-last.log
+*.log

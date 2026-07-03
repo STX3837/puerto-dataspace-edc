@@ -1,0 +1,24 @@
+﻿{
+  "scopes": [],
+  "serviceEndpoints": [
+    {
+      "type": "CredentialService",
+      "serviceEndpoint": "http://provider-identityhub:8182/api/credentials/v1/participants/regulatory-clearance-provider",
+      "id": "provider-credentialservice-1"
+    },
+    {
+      "type": "ProtocolEndpoint",
+      "serviceEndpoint": "http://provider-controlplane:19292/protocol",
+      "id": "provider-dsp"
+    }
+  ],
+  "active": true,
+  "participantId": "did:web:provider-identityhub%3A8183:provider",
+  "participantContextId": "regulatory-clearance-provider",
+  "did": "did:web:provider-identityhub%3A8183:provider",
+  "key": {
+    "keyId": "did:web:provider-identityhub%3A8183:provider#key-1",
+    "privateKeyAlias": "did:web:provider-identityhub%3A8183:provider#key-1",
+    "keyGeneratorParams": { "algorithm": "EC" }
+  }
+}

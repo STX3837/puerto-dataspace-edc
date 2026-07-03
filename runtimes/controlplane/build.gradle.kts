@@ -46,6 +46,8 @@ dependencies {
     runtimeOnly(project(":extensions:example-extension"))
     runtimeOnly(libs.edc.bom.controlplane)
     runtimeOnly(libs.edc.data.plane.selector.control.api)
+    runtimeOnly(libs.edc.vault.hashicorp)
+    implementation(project(":extensions:dcp-impl"))
     // uncomment the following lines to compile with Hashicorp Vault and Postgres persistence
     // runtimeOnly(libs.edc.vault.hashicorp)
     // runtimeOnly(libs.edc.bom.controlplane.sql)

@@ -3,11 +3,7 @@
     "@vocab": "https://w3id.org/edc/v0.0.1/ns/"
   },
   "@type": "CatalogRequest",
-  "counterPartyAddress": "http://provider-controlplane:19292/protocol",
-  "counterPartyId": "regulatory-clearance-provider",
-  "protocol": "dataspace-protocol-http",
-  "querySpec": {
-    "offset": 0,
-    "limit": 50
-  }
+  "counterPartyId": "did:web:provider-identityhub%3A8183:provider",
+  "counterPartyAddress": "http://host.docker.internal:19292/protocol",
+  "protocol": "dataspace-protocol-http"
 }

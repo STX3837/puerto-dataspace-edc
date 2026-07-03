@@ -1,0 +1,11 @@
+﻿{
+  "issuerDid": "did:web:issuer-service%3A10016:issuer",
+  "holderPid": "provider-membership-c37d5b89-ba96-43c0-84a2-c36bf6cebd71",
+  "credentials": [
+    {
+      "format": "vc11-sl2021/jwt",
+      "type": "MembershipCredential",
+      "id": "membership-credential-def"
+    }
+  ]
+}

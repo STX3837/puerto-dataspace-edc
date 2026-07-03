@@ -40,3 +40,4 @@ dependencyResolutionManagement {
 include(":extensions:example-extension")
 include(":runtimes:controlplane")
 include(":runtimes:dataplane")
+include(":extensions:dcp-impl")

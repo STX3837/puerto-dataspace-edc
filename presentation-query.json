@@ -1,0 +1,10 @@
+﻿{
+  "@context": {
+    "@vocab": "https://w3id.org/edc/v0.0.1/ns/"
+  },
+  "@type": "PresentationQueryMessage",
+  "protocol": "DCP",
+  "scope": [
+    "org.eclipse.dspace.dcp.vc.type:MembershipCredential:read"
+  ]
+}

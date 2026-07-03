@@ -1,0 +1,18 @@
+﻿{
+  "@context": {
+    "@vocab": "https://w3id.org/edc/v0.0.1/ns/"
+  },
+  "@id": "provider-dataplane-http-proxy-2",
+  "url": "http://provider-dataplane:19292/control/v1/dataflows",
+  "allowedSourceTypes": "HttpData",
+  "allowedTransferTypes": [
+    "HttpData-PULL-HttpProxy",
+    "HttpData-PULL"
+  ],
+  "destinationProvisionTypes": [
+    "HttpProxy"
+  ],
+  "properties": {
+    "publicApiUrl": "http://provider-dataplane:19294/public"
+  }
+}
