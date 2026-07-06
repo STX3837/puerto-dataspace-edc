@@ -8,7 +8,7 @@
   "counterPartyAddress": "http://provider-controlplane:19292/protocol",
   "protocol": "dataspace-protocol-http",
   "policy": {
-    "@id": "Y29udHJhY3QtY2xlYXJhbmNlLW1zY3U3NjU0MzIx:YXNzZXQtY2xlYXJhbmNlLW1zY3U3NjU0MzIx:OWRmYjAxOTctYzBiYi00OTExLThjMDctNWE1OWM0YThhZjhl",
+    "@id": "Y29udHJhY3QtY2xlYXJhbmNlLW1zY3U3NjU0MzIx:YXNzZXQtY2xlYXJhbmNlLW1zY3U3NjU0MzIx:ZmUyNTgzNjYtZWU5Mi00NzA0LThkZmYtMDIzZTU2OWMwYzQy",
     "@type": "odrl:Offer",
     "odrl:assigner": {
       "@id": "did:web:provider-identityhub%3A8183:provider"

@@ -30,7 +30,6 @@ import org.eclipse.edc.spi.system.ServiceExtension;
 import org.eclipse.edc.spi.system.ServiceExtensionContext;
 import org.eclipse.edc.spi.types.TypeManager;
 import org.eclipse.edc.transform.spi.TypeTransformerRegistry;
-import org.eclipse.edc.transform.transformer.edc.to.JsonValueToGenericTypeTransformer;
 
 import java.util.Map;
 import java.util.Set;
