@@ -86,11 +86,11 @@ jobs:
 
       - name: Run ControlPlane launcher
         run: |
-          docker run -d --rm --name controlplane \
+          docker run -d --rm --name consumer-controlplane \
             --network edc-smoke \
             -p 8182:8182 \
-            -e "EDC_PARTICIPANT_ID=smoke-provider" \
-            -e "EDC_HOSTNAME=controlplane" \
+            -e "EDC_PARTICIPANT_ID=smoke-consumer" \
+            -e "EDC_HOSTNAME=consumer-controlplane" \
             -e "WEB_HTTP_PORT=8080" \
             -e "WEB_HTTP_PATH=/api" \
             -e "WEB_HTTP_MANAGEMENT_PORT=8182" \
@@ -100,11 +100,32 @@ jobs:
             -e "WEB_HTTP_CONTROL_PATH=/control" \
             -e "WEB_HTTP_PROTOCOL_PORT=8282" \
             -e "WEB_HTTP_PROTOCOL_PATH=/protocol" \
-            -e "EDC_DSP_CALLBACK_ADDRESS=http://controlplane:8282/protocol" \
+            -e "EDC_DSP_CALLBACK_ADDRESS=http://consumer-controlplane:8282/protocol" \
+            -e "EDC_IAM_ISSUER_ID=smoke-consumer" \
+            -e "EDC_IAM_STS_OAUTH_TOKEN_URL=http://example.com/token" \
+            -e "EDC_IAM_STS_OAUTH_CLIENT_ID=consumer-client-id" \
+            -e "EDC_IAM_STS_OAUTH_CLIENT_SECRET_ALIAS=consumer-test-alias" \
+            controlplane:latest
+
+          docker run -d --rm --name provider-controlplane \
+            --network edc-smoke \
+            -p 9182:9182 \
+            -e "EDC_PARTICIPANT_ID=smoke-provider" \
+            -e "EDC_HOSTNAME=provider-controlplane" \
+            -e "WEB_HTTP_PORT=8080" \
+            -e "WEB_HTTP_PATH=/api" \
+            -e "WEB_HTTP_MANAGEMENT_PORT=9182" \
+            -e "WEB_HTTP_MANAGEMENT_PATH=/management" \
+            -e "WEB_HTTP_MANAGEMENT_AUTH_KEY=password" \
+            -e "WEB_HTTP_CONTROL_PORT=10101" \
+            -e "WEB_HTTP_CONTROL_PATH=/control" \
+            -e "WEB_HTTP_PROTOCOL_PORT=9282" \
+            -e "WEB_HTTP_PROTOCOL_PATH=/protocol" \
+            -e "EDC_DSP_CALLBACK_ADDRESS=http://provider-controlplane:9282/protocol" \
             -e "EDC_IAM_ISSUER_ID=smoke-provider" \
             -e "EDC_IAM_STS_OAUTH_TOKEN_URL=http://example.com/token" \
-            -e "EDC_IAM_STS_OAUTH_CLIENT_ID=client-id" \
-            -e "EDC_IAM_STS_OAUTH_CLIENT_SECRET_ALIAS=test-alias" \
+            -e "EDC_IAM_STS_OAUTH_CLIENT_ID=provider-client-id" \
+            -e "EDC_IAM_STS_OAUTH_CLIENT_SECRET_ALIAS=provider-test-alias" \
             controlplane:latest
 
       - name: Wait for ControlPlane
