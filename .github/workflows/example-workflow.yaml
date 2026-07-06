@@ -33,7 +33,7 @@ on:
 # Abort old job when a newer one is queued
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   verify-license-headers:
