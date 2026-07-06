@@ -1,0 +1,32 @@
+﻿{
+  "@context": {
+    "@vocab": "https://w3id.org/edc/v0.0.1/ns/",
+    "odrl": "http://www.w3.org/ns/odrl/2/"
+  },
+  "@type": "ContractRequest",
+  "counterPartyId": "did:web:health-identityhub%3A8183:health",
+  "counterPartyAddress": "http://health-controlplane:19292/protocol",
+  "protocol": "dataspace-protocol-http",
+  "policy": {
+    "@id": "Y29udHJhY3QtaGVhbHRoLWNsZWFyYW5jZS1tc2N1NzY1NDMyMQ==:YXNzZXQtaGVhbHRoLWNsZWFyYW5jZS1tc2N1NzY1NDMyMQ==:Mjg4YWQ3MDUtODY4YS00NDI0LTg5YmItOGMxYmMxMTNiODRi",
+    "@type": "odrl:Offer",
+    "odrl:assigner": {
+      "@id": "did:web:health-identityhub%3A8183:health"
+    },
+    "odrl:target": {
+      "@id": "asset-health-clearance-mscu7654321"
+    },
+    "odrl:permission": [
+      {
+        "odrl:action": {
+          "@id": "use"
+        },
+        "odrl:target": {
+          "@id": "asset-health-clearance-mscu7654321"
+        }
+      }
+    ],
+    "odrl:prohibition": [],
+    "odrl:obligation": []
+  }
+}

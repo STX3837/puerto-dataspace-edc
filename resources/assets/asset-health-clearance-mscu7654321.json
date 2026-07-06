@@ -1,0 +1,23 @@
+﻿{
+  "@context": {
+    "@vocab": "https://w3id.org/edc/v0.0.1/ns/"
+  },
+  "@id": "asset-health-clearance-mscu7654321",
+  "properties": {
+    "name": "Health Inspection Status - MSCU7654321",
+    "description": "Estado de inspección sanitaria del contenedor MSCU7654321.",
+    "contenttype": "application/json",
+    "useCase": "Port Regulatory Clearance",
+    "containerId": "MSCU7654321",
+    "authority": "Health Inspection",
+    "dataCategory": "HealthInspectionStatus"
+  },
+  "dataAddress": {
+    "type": "HttpData",
+    "baseUrl": "http://regulatory-clearance-api:8081/containers/MSCU7654321/clearance",
+    "proxyPath": "true",
+    "proxyQueryParams": "true",
+    "proxyBody": "true",
+    "proxyMethod": "true"
+  }
+}

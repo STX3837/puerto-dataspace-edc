@@ -1,0 +1,12 @@
+﻿{
+  "@context": {
+    "@vocab": "https://w3id.org/edc/v0.0.1/ns/"
+  },
+  "@type": "TransferRequest",
+  "counterPartyId": "did:web:health-identityhub%3A8183:health",
+  "counterPartyAddress": "http://health-controlplane:19292/protocol",
+  "protocol": "dataspace-protocol-http",
+  "assetId": "asset-health-clearance-mscu7654321",
+  "contractId": "fc964da6-2fd8-4073-8552-500a4f6fb9dc",
+  "transferType": "HttpData-PULL"
+}

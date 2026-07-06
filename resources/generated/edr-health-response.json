@@ -1,0 +1,13 @@
+﻿{
+    "@type":  "DataAddress",
+    "type":  "https://w3id.org/idsa/v4.1/HTTP",
+    "endpoint":  "http://health-dataplane:19294/public",
+    "authType":  "bearer",
+    "endpointType":  "https://w3id.org/idsa/v4.1/HTTP",
+    "authorization":  "eyJraWQiOiJwdWJsaWMta2V5IiwiYWxnIjoiUlMyNTYifQ.eyJpc3MiOiJkaWQ6d2ViOmhlYWx0aC1pZGVudGl0eWh1YiUzQTgxODM6aGVhbHRoIiwiYXVkIjoiZGlkOndlYjpjb25zdW1lci1pZGVudGl0eWh1YiUzQTcwODM6Y29uc3VtZXIiLCJzdWIiOiJkaWQ6d2ViOmhlYWx0aC1pZGVudGl0eWh1YiUzQTgxODM6aGVhbHRoIiwiaWF0IjoxNzgzMzM0MzcxLCJqdGkiOiJlOTY5NTAzNy1kMDI5LTRhMGMtODcxMC04MzMzZDdjYmY5NTQifQ.ZVxXHhh8noKg4OgiwSx8lgUBLuPDP0iijgHX8CZGMHz0TXouSBH6bNi5mxxQbYJq9P80E2XqAqlj4CjsECSH8fMzBLJT9rT4S7bjmVZpQwRxmoYLnWOShmGoYltgHlglUhCcF7Cs2kubY9AwL6pSjfrGU9YXvwRm7Ojn3ocjng2cqKSqNmhflbKSIHotps-z8eySisErsXxOg2uKJf6irLq68nM6PrG6kXAFfPglZPbw32edxgnrjgV_aYjXb3ocwx9CBHzqFUSfiWsGfQZOIilR6Au-Ae5c2dIhibSirjY-xgK1ydSTEZ1DQxaB0_yW2vAqSINhVanlLMdy0YrSiA",
+    "@context":  {
+                     "@vocab":  "https://w3id.org/edc/v0.0.1/ns/",
+                     "edc":  "https://w3id.org/edc/v0.0.1/ns/",
+                     "odrl":  "http://www.w3.org/ns/odrl/2/"
+                 }
+}
