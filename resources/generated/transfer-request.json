@@ -7,6 +7,6 @@
   "counterPartyAddress": "http://provider-controlplane:19292/protocol",
   "protocol": "dataspace-protocol-http",
   "assetId": "asset-clearance-mscu7654321",
-  "contractId": "e8fdf756-3b95-4530-849f-5c3b304b77d7",
+  "contractId": "7a9698ac-cc24-4034-af56-696bfd589aec",
   "transferType": "HttpData-PULL"
 }
