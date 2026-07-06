@@ -1,0 +1,26 @@
+﻿{
+  "scopes": [],
+  "serviceEndpoints": [
+    {
+      "type": "CredentialService",
+      "serviceEndpoint": "http://health-identityhub:8182/api/credentials/v1/participants/health",
+      "id": "health-credentialservice-1"
+    },
+    {
+      "type": "ProtocolEndpoint",
+      "serviceEndpoint": "http://health-controlplane:19292/protocol",
+      "id": "health-dsp"
+    }
+  ],
+  "active": true,
+  "participantId": "did:web:health-identityhub%3A8183:health",
+  "participantContextId": "health",
+  "did": "did:web:health-identityhub%3A8183:health",
+  "key": {
+    "keyId": "did:web:health-identityhub%3A8183:health#key-1",
+    "privateKeyAlias": "did:web:health-identityhub%3A8183:health#key-1",
+    "keyGeneratorParams": {
+      "algorithm": "EC"
+    }
+  }
+}

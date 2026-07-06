@@ -1,0 +1,9 @@
+﻿{
+  "@context": {
+    "@vocab": "https://w3id.org/edc/v0.0.1/ns/"
+  },
+  "@type": "CatalogRequest",
+  "counterPartyId": "did:web:civilguard-identityhub%3A8183:civilguard",
+  "counterPartyAddress": "http://civilguard-controlplane:19292/protocol",
+  "protocol": "dataspace-protocol-http"
+}

@@ -4,17 +4,17 @@
     "odrl": "http://www.w3.org/ns/odrl/2/"
   },
   "@type": "ContractRequest",
-  "counterPartyId": "did:web:provider-identityhub%3A8183:provider",
-  "counterPartyAddress": "http://provider-controlplane:19292/protocol",
+  "counterPartyId": "did:web:health-identityhub%3A8183:health",
+  "counterPartyAddress": "http://health-controlplane:19292/protocol",
   "protocol": "dataspace-protocol-http",
   "policy": {
-    "@id": "Y29udHJhY3QtY2xlYXJhbmNlLW1zY3U3NjU0MzIx:YXNzZXQtY2xlYXJhbmNlLW1zY3U3NjU0MzIx:NTMyOGNhOWEtYWU2Yy00ZmU5LWE1YmMtMDY0OTRkZmQ0OGVk",
+    "@id": "Y29udHJhY3QtaGVhbHRoLWNsZWFyYW5jZS1tc2N1NzY1NDMyMQ==:YXNzZXQtaGVhbHRoLWNsZWFyYW5jZS1tc2N1NzY1NDMyMQ==:M2IwN2ZlMjAtZTUxYy00MmNhLWIwOGItYTczZmNhNzhjMDE3",
     "@type": "odrl:Offer",
     "odrl:assigner": {
-      "@id": "did:web:provider-identityhub%3A8183:provider"
+      "@id": "did:web:health-identityhub%3A8183:health"
     },
     "odrl:target": {
-      "@id": "asset-clearance-mscu7654321"
+      "@id": "asset-health-clearance-mscu7654321"
     },
     "odrl:permission": [
       {
@@ -22,7 +22,7 @@
           "@id": "use"
         },
         "odrl:target": {
-          "@id": "asset-clearance-mscu7654321"
+          "@id": "asset-health-clearance-mscu7654321"
         }
       }
     ],

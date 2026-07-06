@@ -1,0 +1,26 @@
+﻿{
+  "scopes": [],
+  "serviceEndpoints": [
+    {
+      "type": "CredentialService",
+      "serviceEndpoint": "http://civilguard-identityhub:8182/api/credentials/v1/participants/civilguard",
+      "id": "civilguard-credentialservice-1"
+    },
+    {
+      "type": "ProtocolEndpoint",
+      "serviceEndpoint": "http://civilguard-controlplane:19292/protocol",
+      "id": "civilguard-dsp"
+    }
+  ],
+  "active": true,
+  "participantId": "did:web:civilguard-identityhub%3A8183:civilguard",
+  "participantContextId": "civilguard",
+  "did": "did:web:civilguard-identityhub%3A8183:civilguard",
+  "key": {
+    "keyId": "did:web:civilguard-identityhub%3A8183:civilguard#key-1",
+    "privateKeyAlias": "did:web:civilguard-identityhub%3A8183:civilguard#key-1",
+    "keyGeneratorParams": {
+      "algorithm": "EC"
+    }
+  }
+}

@@ -1,0 +1,13 @@
+﻿{
+    "@type":  "DataAddress",
+    "type":  "https://w3id.org/idsa/v4.1/HTTP",
+    "endpoint":  "http://civilguard-dataplane:19294/public",
+    "authType":  "bearer",
+    "endpointType":  "https://w3id.org/idsa/v4.1/HTTP",
+    "authorization":  "eyJraWQiOiJwdWJsaWMta2V5IiwiYWxnIjoiUlMyNTYifQ.eyJpc3MiOiJkaWQ6d2ViOmNpdmlsZ3VhcmQtaWRlbnRpdHlodWIlM0E4MTgzOmNpdmlsZ3VhcmQiLCJhdWQiOiJkaWQ6d2ViOmNvbnN1bWVyLWlkZW50aXR5aHViJTNBNzA4Mzpjb25zdW1lciIsInN1YiI6ImRpZDp3ZWI6Y2l2aWxndWFyZC1pZGVudGl0eWh1YiUzQTgxODM6Y2l2aWxndWFyZCIsImlhdCI6MTc4MzMzNzQ1NiwianRpIjoiZDVjYTIxMGItOWFlMi00ZTM3LTk1NzYtMDRlMmEzNjcxNzBlIn0.hEkP6Zlw7eSMugn0TeaAeetCcXGplV7KngmLO2-obKFWjfyKmTpJONbmUuKzb0Vci3X0gweIICnIc8t88ocgDVUj8Swd0Unw3w1L3BOTOLYn-bbw87bpil8q8wmrdH9TEwVIv52XjaPXiXkrZ_iS5sezOK_gEiOYIbdKRqGUF_quCnvNYhnBbEXVYhmXFiGtfgLZDrz3xJOrYMo5Gk-KOCc8k6m074ZgORfDRJQMftmp0w1lA6SGPTAbv8tKL1gvfIOCsSB7ybKo62po0OG9Le4ET7laaDDTGkITvJFzU-0p2XAJ78vEPfSpzzQfN4UA-pUzrOg5PWefDsnSRymAqg",
+    "@context":  {
+                     "@vocab":  "https://w3id.org/edc/v0.0.1/ns/",
+                     "edc":  "https://w3id.org/edc/v0.0.1/ns/",
+                     "odrl":  "http://www.w3.org/ns/odrl/2/"
+                 }
+}

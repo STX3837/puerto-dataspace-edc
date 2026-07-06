@@ -1,0 +1,12 @@
+﻿{
+    "@context":  {
+                     "@vocab":  "https://w3id.org/edc/v0.0.1/ns/"
+                 },
+    "@type":  "TransferRequest",
+    "counterPartyId":  "did:web:civilguard-identityhub%3A8183:civilguard",
+    "counterPartyAddress":  "http://civilguard-controlplane:19292/protocol",
+    "protocol":  "dataspace-protocol-http",
+    "assetId":  "asset-civilguard-clearance-mscu7654321",
+    "contractId":  "fb717013-1f03-4171-9708-78f924d914f7",
+    "transferType":  "HttpData-PULL"
+}

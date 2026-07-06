@@ -1,0 +1,11 @@
+﻿{
+  "issuerDid": "did:web:issuer-service%3A10016:issuer",
+  "holderPid": "health-membership-cf95fab9-4c7d-404a-bbb4-5f3a4c26ea41",
+  "credentials": [
+    {
+      "format": "vc11-sl2021/jwt",
+      "type": "MembershipCredential",
+      "id": "membership-credential-def"
+    }
+  ]
+}
