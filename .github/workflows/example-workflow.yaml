@@ -86,7 +86,7 @@ jobs:
 
       - name: Run ControlPlane launcher
         run: |
-          docker run -d --rm --name consumer-controlplane \
+          docker run -d --name consumer-controlplane \
             --network edc-smoke \
             -p 8182:8182 \
             -e "EDC_PARTICIPANT_ID=smoke-consumer" \
@@ -107,7 +107,7 @@ jobs:
             -e "EDC_IAM_STS_OAUTH_CLIENT_SECRET_ALIAS=consumer-test-alias" \
             controlplane:latest
 
-          docker run -d --rm --name provider-controlplane \
+          docker run -d --name provider-controlplane \
             --network edc-smoke \
             -p 9182:9182 \
             -e "EDC_PARTICIPANT_ID=smoke-provider" \
@@ -128,6 +128,10 @@ jobs:
             -e "EDC_IAM_STS_OAUTH_CLIENT_SECRET_ALIAS=provider-test-alias" \
             controlplane:latest
 
+          docker ps -a
+          docker logs consumer-controlplane || true
+          docker logs provider-controlplane || true
+          
       - name: Wait for ControlPlane
         run: |
           for name in consumer-controlplane provider-controlplane; do
@@ -152,7 +156,7 @@ jobs:
 
       - name: Run DataPlane launcher
         run: |
-          docker run -d --rm --name dataplane \
+          docker run -d --name dataplane \
             --network edc-smoke \
             -e "EDC_PARTICIPANT_ID=smoke-provider" \
             -e "EDC_HOSTNAME=dataplane" \
@@ -163,7 +167,7 @@ jobs:
             -e "WEB_HTTP_PUBLIC_PORT=8185" \
             -e "WEB_HTTP_PUBLIC_PATH=/public" \
             -e "EDC_DATAPLANE_API_PUBLIC_BASEURL=http://dataplane:8185/public" \
-            -e "EDC_DPF_SELECTOR_URL=http://controlplane:10001/control/v1/dataplanes" \
+            -e "EDC_DPF_SELECTOR_URL=http://provider-controlplane:10001/control/v1/dataplanes" \
             -e "EDC_TRANSFER_PROXY_TOKEN_VERIFIER_PUBLICKEY_ALIAS=testalias" \
             -e "EDC_TRANSFER_PROXY_TOKEN_SIGNER_PRIVATEKEY_ALIAS=testalias" \
             dataplane:latest
@@ -200,5 +204,6 @@ jobs:
         if: always()
         run: |
           docker ps -a
-          docker logs controlplane || true
+          docker logs consumer-controlplane || true
+          docker logs provider-controlplane || true
           docker logs dataplane || true
