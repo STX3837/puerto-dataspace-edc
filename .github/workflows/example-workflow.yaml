@@ -179,6 +179,26 @@ jobs:
             done
           done
 
+      - name: Check Provider Control API
+        run: |
+          docker ps -a
+          docker logs provider-controlplane || true
+
+          for i in {1..60}; do
+            if docker run --rm --network edc-smoke curlimages/curl:8.10.1 \
+              -sf http://provider-controlplane:10101/control/v1/dataplanes; then
+              echo "Provider control API reachable"
+              exit 0
+            fi
+
+            echo "Waiting for provider control API..."
+            sleep 2
+          done
+
+          echo "Provider control API not reachable"
+          docker logs provider-controlplane || true
+          exit 1
+
       - name: Run DataPlane launcher
         run: |
           docker run -d --name dataplane \
@@ -192,7 +212,7 @@ jobs:
             -e "WEB_HTTP_PUBLIC_PORT=8185" \
             -e "WEB_HTTP_PUBLIC_PATH=/public" \
             -e "EDC_DATAPLANE_API_PUBLIC_BASEURL=http://dataplane:8185/public" \
-            -e "EDC_DPF_SELECTOR_URL=http://provider-controlplane:10001/control/v1/dataplanes" \
+            -e "EDC_DPF_SELECTOR_URL=http://provider-controlplane:10101/control/v1/dataplanes" \
             -e "EDC_TRANSFER_PROXY_TOKEN_VERIFIER_PUBLICKEY_ALIAS=testalias" \
             -e "EDC_TRANSFER_PROXY_TOKEN_SIGNER_PRIVATEKEY_ALIAS=testalias" \
             -e "EDC_VAULT_HASHICORP_URL=http://vault:8200" \
