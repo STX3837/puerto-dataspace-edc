@@ -121,6 +121,60 @@ services:
       WEB_HTTP_PUBLIC_PORT: 19294
       WEB_HTTP_PUBLIC_PATH: /public
 
+  civilguard-controlplane:
+    image: puerto-edc-controlplane:latest
+    container_name: civilguard-controlplane
+    ports:
+      - "22193:19193"
+      - "22292:19292"
+      - "22194:19194"
+    environment:
+      - EDC_PARTICIPANT_ID=did:web:civilguard-identityhub%3A8183:civilguard
+      - EDC_IAM_ISSUER_ID=did:web:civilguard-identityhub%3A8183:civilguard
+      - EDC_IAM_STS_OAUTH_TOKEN_URL=http://civilguard-identityhub:8184/api/sts/token
+      - EDC_IAM_STS_OAUTH_CLIENT_ID=did:web:civilguard-identityhub%3A8183:civilguard
+      - EDC_IAM_STS_OAUTH_CLIENT_SECRET_ALIAS=civilguard-provider-sts-client-secret
+      - EDC_VAULT_HASHICORP_URL=http://host.docker.internal:8200
+      - EDC_VAULT_HASHICORP_TOKEN=root
+      - EDC_HOSTNAME=civilguard-controlplane
+      - WEB_HTTP_PORT=19191
+      - WEB_HTTP_PATH=/api
+      - WEB_HTTP_MANAGEMENT_PORT=19193
+      - WEB_HTTP_MANAGEMENT_PATH=/management
+      - WEB_HTTP_MANAGEMENT_AUTH_KEY=provider-api-key
+      - WEB_HTTP_PROTOCOL_PORT=19292
+      - WEB_HTTP_PROTOCOL_PATH=/protocol
+      - WEB_HTTP_CONTROL_PORT=19194
+      - WEB_HTTP_CONTROL_PATH=/control
+      - EDC_DSP_CALLBACK_ADDRESS=http://civilguard-controlplane:19292/protocol
+      - edc.iam.trusted-issuer.consumer.id=did:web:consumer-identityhub%3A7083:consumer
+      - 'edc.iam.trusted-issuer.consumer.supportedtypes=["VerifiablePresentation","EnvelopedVerifiablePresentation","VerifiableCredential","EnvelopedVerifiableCredential","MembershipCredential"]'
+      - edc.iam.did.web.use.https=false
+      - edc.iam.trusted-issuer.issuer.id=did:web:issuer-service%3A10016:issuer
+      - 'edc.iam.trusted-issuer.issuer.supportedtypes=["VerifiableCredential","EnvelopedVerifiableCredential","MembershipCredential","BitstringStatusListCredential"]'
+      - edc.iam.credential.revocation.mimetype=application/json
+
+  civilguard-dataplane:
+    image: puerto-edc-dataplane:latest
+    container_name: civilguard-dataplane
+    ports:
+      - "22294:19294"
+    environment:
+      EDC_PARTICIPANT_ID: did:web:civilguard-identityhub%3A8183:civilguard
+      EDC_TRANSFER_PROXY_TOKEN_SIGNER_PRIVATEKEY_ALIAS: private-key
+      EDC_TRANSFER_PROXY_TOKEN_VERIFIER_PUBLICKEY_ALIAS: public-key
+      EDC_VAULT_HASHICORP_URL: http://host.docker.internal:8200
+      EDC_VAULT_HASHICORP_TOKEN: root
+      EDC_DPF_SELECTOR_URL: http://civilguard-controlplane:19194/control/v1/dataplanes
+      EDC_HOSTNAME: civilguard-dataplane
+      EDC_DATAPLANE_API_PUBLIC_BASEURL: http://civilguard-dataplane:19294/public
+      WEB_HTTP_PORT: 19291
+      WEB_HTTP_PATH: /api
+      WEB_HTTP_CONTROL_PORT: 19292
+      WEB_HTTP_CONTROL_PATH: /control
+      WEB_HTTP_PUBLIC_PORT: 19294
+      WEB_HTTP_PUBLIC_PATH: /public
+
   consumer-controlplane:
     image: puerto-edc-controlplane:latest
     container_name: consumer-controlplane
@@ -151,6 +205,8 @@ services:
       - 'edc.iam.trusted-issuer.provider.supportedtypes=["VerifiableCredential","EnvelopedVerifiableCredential","VerifiablePresentation","EnvelopedVerifiablePresentation","MembershipCredential"]'
       - edc.iam.trusted-issuer.health.id=did:web:health-identityhub%3A8183:health
       - 'edc.iam.trusted-issuer.health.supportedtypes=["VerifiableCredential","EnvelopedVerifiableCredential","VerifiablePresentation","EnvelopedVerifiablePresentation","MembershipCredential"]'
+      - edc.iam.trusted-issuer.civilguard.id=did:web:civilguard-identityhub%3A8183:civilguard
+      - 'edc.iam.trusted-issuer.civilguard.supportedtypes=["VerifiableCredential","EnvelopedVerifiableCredential","VerifiablePresentation","EnvelopedVerifiablePresentation","MembershipCredential"]'
       - edc.iam.did.web.use.https=false
       - edc.iam.trusted-issuer.issuer.id=did:web:issuer-service%3A10016:issuer
       - 'edc.iam.trusted-issuer.issuer.supportedtypes=["VerifiableCredential","EnvelopedVerifiableCredential","MembershipCredential","BitstringStatusListCredential"]'
@@ -213,6 +269,21 @@ services:
     depends_on:
       - health-identityhub-postgres
 
+  civilguard-identityhub:
+    image: puerto-identityhub-mvd:latest
+    container_name: civilguard-identityhub
+    ports:
+      - "7480:8180"
+      - "7481:8181"
+      - "7482:8182"
+      - "7483:8183"
+      - "7484:8184"
+    volumes:
+      - ./config/civilguard-identityhub.properties:/app/dataspaceconnector-configuration.properties
+
+    depends_on:
+      - civilguard-identityhub-postgres
+
   consumer-identityhub:
     image: puerto-identityhub-mvd:latest
     container_name: consumer-identityhub
@@ -247,6 +318,16 @@ services:
       POSTGRES_PASSWORD: identityhub
     ports:
       - "7434:5432"
+
+  civilguard-identityhub-postgres:
+    image: postgres:16
+    container_name: civilguard-identityhub-postgres
+    environment:
+      POSTGRES_DB: identityhub
+      POSTGRES_USER: identityhub
+      POSTGRES_PASSWORD: identityhub
+    ports:
+      - "7435:5432"
 
   consumer-identityhub-postgres:
     image: postgres:16

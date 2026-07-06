@@ -1,0 +1,11 @@
+﻿{
+  "issuerDid": "did:web:issuer-service%3A10016:issuer",
+  "holderPid": "civilguard-membership-f04c93d8-f01a-4c50-b8bc-aed5fe45111d",
+  "credentials": [
+    {
+      "format": "vc11-sl2021/jwt",
+      "type": "MembershipCredential",
+      "id": "membership-credential-def"
+    }
+  ]
+}

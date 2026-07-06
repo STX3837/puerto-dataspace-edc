@@ -4,7 +4,7 @@
     "endpoint":  "http://health-dataplane:19294/public",
     "authType":  "bearer",
     "endpointType":  "https://w3id.org/idsa/v4.1/HTTP",
-    "authorization":  "eyJraWQiOiJwdWJsaWMta2V5IiwiYWxnIjoiUlMyNTYifQ.eyJpc3MiOiJkaWQ6d2ViOmhlYWx0aC1pZGVudGl0eWh1YiUzQTgxODM6aGVhbHRoIiwiYXVkIjoiZGlkOndlYjpjb25zdW1lci1pZGVudGl0eWh1YiUzQTcwODM6Y29uc3VtZXIiLCJzdWIiOiJkaWQ6d2ViOmhlYWx0aC1pZGVudGl0eWh1YiUzQTgxODM6aGVhbHRoIiwiaWF0IjoxNzgzMzM0MzcxLCJqdGkiOiJlOTY5NTAzNy1kMDI5LTRhMGMtODcxMC04MzMzZDdjYmY5NTQifQ.ZVxXHhh8noKg4OgiwSx8lgUBLuPDP0iijgHX8CZGMHz0TXouSBH6bNi5mxxQbYJq9P80E2XqAqlj4CjsECSH8fMzBLJT9rT4S7bjmVZpQwRxmoYLnWOShmGoYltgHlglUhCcF7Cs2kubY9AwL6pSjfrGU9YXvwRm7Ojn3ocjng2cqKSqNmhflbKSIHotps-z8eySisErsXxOg2uKJf6irLq68nM6PrG6kXAFfPglZPbw32edxgnrjgV_aYjXb3ocwx9CBHzqFUSfiWsGfQZOIilR6Au-Ae5c2dIhibSirjY-xgK1ydSTEZ1DQxaB0_yW2vAqSINhVanlLMdy0YrSiA",
+    "authorization":  "eyJraWQiOiJwdWJsaWMta2V5IiwiYWxnIjoiUlMyNTYifQ.eyJpc3MiOiJkaWQ6d2ViOmhlYWx0aC1pZGVudGl0eWh1YiUzQTgxODM6aGVhbHRoIiwiYXVkIjoiZGlkOndlYjpjb25zdW1lci1pZGVudGl0eWh1YiUzQTcwODM6Y29uc3VtZXIiLCJzdWIiOiJkaWQ6d2ViOmhlYWx0aC1pZGVudGl0eWh1YiUzQTgxODM6aGVhbHRoIiwiaWF0IjoxNzgzMzM3NDQ4LCJqdGkiOiIwY2ZjM2NiYS00MWFhLTQxYzgtYmVhZC1lYjhiNWNhOTk1NzMifQ.Ol7yJrnZaG111D9r2LY9Wn-xKP8nguYIdK_OtHlhNapnSkrZQbHFHRCepninbCmkzqquvIfIhKOX634OGQWgGLIpeVzMkfz8c5ek8M-zonFvlFSI0K1yagu2iQ3GbriDkMlPuJ6MwN_g_ayLl4_5UUn3hO-PiwevRJBtN1BCL32UEpucEo3JdjHX97ZhGK7UTnzxB8DfF_Swu-pWxDD3EFbsmpzJHUexokGpApZyqMp3T-FpX6F9qS8r6Q0TjpXV3s9vOcISju34Hyci-8hcZgywfqzxxf34jX6zII7Bl1rbcEk_xW6J4_td0cAOf_jRJNRdUJ3hSeSauyU17VVRNQ",
     "@context":  {
                      "@vocab":  "https://w3id.org/edc/v0.0.1/ns/",
                      "edc":  "https://w3id.org/edc/v0.0.1/ns/",

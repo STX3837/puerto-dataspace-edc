@@ -1,0 +1,32 @@
+﻿{
+  "@context": {
+    "@vocab": "https://w3id.org/edc/v0.0.1/ns/",
+    "odrl": "http://www.w3.org/ns/odrl/2/"
+  },
+  "@type": "ContractRequest",
+  "counterPartyId": "did:web:civilguard-identityhub%3A8183:civilguard",
+  "counterPartyAddress": "http://civilguard-controlplane:19292/protocol",
+  "protocol": "dataspace-protocol-http",
+  "policy": {
+    "@id": "Y29udHJhY3QtY2l2aWxndWFyZC1jbGVhcmFuY2UtbXNjdTc2NTQzMjE=:YXNzZXQtY2l2aWxndWFyZC1jbGVhcmFuY2UtbXNjdTc2NTQzMjE=:MWNkMGYwZmItN2U1NS00ZjViLWJhNTItNWY2MzI0YjZiMzA2",
+    "@type": "odrl:Offer",
+    "odrl:assigner": {
+      "@id": "did:web:civilguard-identityhub%3A8183:civilguard"
+    },
+    "odrl:target": {
+      "@id": "asset-civilguard-clearance-mscu7654321"
+    },
+    "odrl:permission": [
+      {
+        "odrl:action": {
+          "@id": "use"
+        },
+        "odrl:target": {
+          "@id": "asset-civilguard-clearance-mscu7654321"
+        }
+      }
+    ],
+    "odrl:prohibition": [],
+    "odrl:obligation": []
+  }
+}
