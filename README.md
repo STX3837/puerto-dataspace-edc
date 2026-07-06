@@ -194,6 +194,31 @@ Los artefactos de ejecución se escriben en `resources/generated/`:
 - `downloaded-*-clearance.json`: datos descargados de cada provider.
 - `aggregated-clearance-status.json`: resultado final consolidado.
 
+## Tests unitarios
+
+Los tests unitarios validan la lógica DCP sin necesidad de levantar Docker:
+
+- extracción del scope `DataProcessorCredential`;
+- combinación de scopes requeridos y existentes;
+- aceptación de una `MembershipCredential` activa;
+- rechazo de operadores, operands, fechas futuras, credenciales ausentes y
+  claims malformados.
+
+Para ejecutarlos en Windows:
+
+```powershell
+.\gradlew.bat test
+```
+
+En Linux o macOS:
+
+```bash
+./gradlew test
+```
+
+El workflow de GitHub Actions ejecuta estos tests antes del smoke test y
+publica los informes HTML y JUnit como el artefacto `unit-test-reports`.
+
 ## Diagnóstico
 
 Estado de los contenedores:

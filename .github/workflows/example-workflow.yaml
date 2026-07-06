@@ -66,13 +66,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-java
-      - name: Run Unit tests
-        run: ./gradlew test
+      - name: Run unit tests
+        run: ./gradlew test --stacktrace
+
+      - name: Upload unit test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: |
+            **/build/reports/tests/test/**
+            **/build/test-results/test/**
+          if-no-files-found: error
 
   # Verify that both the control plane and data plane are runnable (given some basic config)
   smoke-tests:
     runs-on: ubuntu-latest
-    needs: verify-license-headers
+    needs: [ verify-license-headers, unit-tests ]
     steps:
       - uses: actions/checkout@v4
 
