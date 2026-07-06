@@ -86,6 +86,23 @@ jobs:
 
       - name: Run ControlPlane launcher
         run: |
+
+          docker network create edc-smoke || true
+
+          docker run -d --name vault \
+            --network edc-smoke \
+            -e VAULT_DEV_ROOT_TOKEN_ID=root \
+            -e VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200 \
+            hashicorp/vault:latest
+
+          for i in {1..30}; do
+            if docker logs vault 2>&1 | grep -q "Development mode should NOT be used"; then
+              echo "Vault ready"
+              break
+            fi
+            sleep 2
+          done
+
           docker run -d --name consumer-controlplane \
             --network edc-smoke \
             -p 8182:8182 \
@@ -105,6 +122,8 @@ jobs:
             -e "EDC_IAM_STS_OAUTH_TOKEN_URL=http://example.com/token" \
             -e "EDC_IAM_STS_OAUTH_CLIENT_ID=consumer-client-id" \
             -e "EDC_IAM_STS_OAUTH_CLIENT_SECRET_ALIAS=consumer-test-alias" \
+            -e "EDC_VAULT_HASHICORP_URL=http://vault:8200" \
+            -e "EDC_VAULT_HASHICORP_TOKEN=root" \
             controlplane:latest
 
           docker run -d --name provider-controlplane \
@@ -126,6 +145,8 @@ jobs:
             -e "EDC_IAM_STS_OAUTH_TOKEN_URL=http://example.com/token" \
             -e "EDC_IAM_STS_OAUTH_CLIENT_ID=provider-client-id" \
             -e "EDC_IAM_STS_OAUTH_CLIENT_SECRET_ALIAS=provider-test-alias" \
+            -e "EDC_VAULT_HASHICORP_URL=http://vault:8200" \
+            -e "EDC_VAULT_HASHICORP_TOKEN=root" \
             controlplane:latest
 
           docker ps -a
