@@ -62,22 +62,19 @@ public class MembershipCredentialEvaluationFunction<C extends ParticipantAgentPo
         System.err.println("PATCH_MEMBERSHIP_POLICY_REACHED");
 
         return credentialResult.getContent()
-            .stream()
-            .anyMatch(vc -> vc.getType().stream().anyMatch(t -> t.endsWith(MEMBERSHIP_CONSTRAINT_KEY)));
-        // return credentialResult.getContent()
-        //         .stream()
-        //         .filter(vc -> vc.getType().stream().anyMatch(t -> t.endsWith(MEMBERSHIP_CONSTRAINT_KEY)))
-        //         .flatMap(vc -> vc.getCredentialSubject().stream().filter(cs -> cs.getClaims().containsKey(MEMBERSHIP_CLAIM)))
-        //         .anyMatch(credential -> {
-        //             var membershipClaim = (Map<String, ?>) credential.getClaims().get(MEMBERSHIP_CLAIM);
+                .stream()
+                .filter(vc -> vc.getType().stream().anyMatch(t -> t.endsWith(MEMBERSHIP_CONSTRAINT_KEY)))
+                .flatMap(vc -> vc.getCredentialSubject().stream().filter(cs -> cs.getClaims().containsKey(MEMBERSHIP_CLAIM)))
+                .anyMatch(credential -> {
+                    var membershipClaim = (Map<String, ?>) credential.getClaims().get(MEMBERSHIP_CLAIM);
 
-        //             if (membershipClaim == null || !membershipClaim.containsKey(SINCE_CLAIM)) {
-        //                 return false;
-        //             }
+                    if (membershipClaim == null || !membershipClaim.containsKey(SINCE_CLAIM)) {
+                        return false;
+                    }
 
-        //             var membershipStartDate = Instant.parse(membershipClaim.get(SINCE_CLAIM).toString());
-        //             return membershipStartDate.isBefore(Instant.now());
-        //         });
+                    var membershipStartDate = Instant.parse(membershipClaim.get(SINCE_CLAIM).toString());
+                    return membershipStartDate.isBefore(Instant.now());
+                });
     }
 
 }

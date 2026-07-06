@@ -109,24 +109,25 @@ jobs:
 
       - name: Wait for ControlPlane
         run: |
-          for i in {1..60}; do
-            if docker logs controlplane 2>&1 | grep -q "Runtime .* ready"; then
-              echo "ControlPlane ready"
-              exit 0
-            fi
+          for name in consumer-controlplane provider-controlplane; do
+            echo "Waiting for $name..."
 
-            if ! docker ps --format '{{.Names}}' | grep -q '^controlplane$'; then
-              echo "ControlPlane exited"
-              docker logs controlplane
-              exit 1
-            fi
+            for i in {1..60}; do
+              if docker logs "$name" 2>&1 | grep -q "Runtime .* ready"; then
+                echo "$name ready"
+                break
+              fi
 
-            sleep 2
+              if ! docker ps --format '{{.Names}}' | grep -q "^${name}$"; then
+                echo "$name exited or does not exist"
+                docker ps -a
+                docker logs "$name" || true
+                exit 1
+              fi
+
+              sleep 2
+            done
           done
-
-          echo "ControlPlane did not become ready"
-          docker logs controlplane
-          exit 1
 
       - name: Run DataPlane launcher
         run: |
