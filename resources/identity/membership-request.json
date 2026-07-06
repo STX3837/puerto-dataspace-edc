@@ -1,0 +1,11 @@
+{
+  "issuerDid": "did:web:issuer-service%3A10016:issuer",
+  "holderPid": "transport-company-a-membership-0de949c5-501f-4a9b-8c31-e0f7821615a6",
+  "credentials": [
+    {
+      "format": "vc11-sl2021/jwt",
+      "type": "MembershipCredential",
+      "id": "membership-credential-def"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+﻿{
+  "scopes": ["issuer-admin-api:admin"],
+  "serviceEndpoints": [
+    {
+      "type": "IssuerService",
+      "serviceEndpoint": "http://issuer-service:10012/api/issuance/v1beta/participants/issuer",
+      "id": "issuer-service-1"
+    }
+  ],
+  "active": true,
+  "participantId": "did:web:issuer-service%3A10016:issuer",
+  "participantContextId": "issuer",
+  "did": "did:web:issuer-service%3A10016:issuer",
+  "key": {
+    "keyId": "did:web:issuer-service%3A10016:issuer#key-1",
+    "privateKeyAlias": "did:web:issuer-service%3A10016:issuer#key-1",
+    "keyGeneratorParams": { "algorithm": "EC" }
+  }
+}

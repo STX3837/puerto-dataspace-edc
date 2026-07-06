@@ -1,0 +1,16 @@
+﻿{
+  "@context": {
+    "@vocab": "https://w3id.org/edc/v0.0.1/ns/"
+  },
+  "@id": "contract-demo-1",
+  "accessPolicyId": "policy-allow-use",
+  "contractPolicyId": "policy-allow-use",
+  "assetsSelector": [
+    {
+      "@type": "Criterion",
+      "operandLeft": "https://w3id.org/edc/v0.0.1/ns/id",
+      "operator": "=",
+      "operandRight": "asset-demo-1"
+    }
+  ]
+}

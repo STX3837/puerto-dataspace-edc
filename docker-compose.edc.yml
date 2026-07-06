@@ -21,22 +21,30 @@ services:
       - "19292:19292"
       - "19194:19194"
     environment:
-      EDC_PARTICIPANT_ID: regulatory-clearance-provider
-      EDC_IAM_ISSUER_ID: regulatory-clearance-provider
-      EDC_IAM_STS_OAUTH_TOKEN_URL: http://host.docker.internal:8080/realms/logistics-dataspace/protocol/openid-connect/token
-      EDC_IAM_STS_OAUTH_CLIENT_ID: edc-provider-controlplane
-      EDC_IAM_STS_OAUTH_CLIENT_SECRET_ALIAS: edc-provider-controlplane-secret
-      EDC_HOSTNAME: provider-controlplane
-      WEB_HTTP_PORT: 19191
-      WEB_HTTP_PATH: /api
-      WEB_HTTP_MANAGEMENT_PORT: 19193
-      WEB_HTTP_MANAGEMENT_PATH: /management
-      WEB_HTTP_MANAGEMENT_AUTH_KEY: provider-api-key
-      WEB_HTTP_PROTOCOL_PORT: 19292
-      WEB_HTTP_PROTOCOL_PATH: /protocol
-      WEB_HTTP_CONTROL_PORT: 19194
-      WEB_HTTP_CONTROL_PATH: /control
-      EDC_DSP_CALLBACK_ADDRESS: http://provider-controlplane:19292/protocol
+      - EDC_PARTICIPANT_ID=did:web:provider-identityhub%3A8183:provider
+      - EDC_IAM_ISSUER_ID=did:web:provider-identityhub%3A8183:provider
+      - EDC_IAM_STS_OAUTH_TOKEN_URL=http://provider-identityhub:8184/api/sts/token
+      - EDC_IAM_STS_OAUTH_CLIENT_ID=did:web:provider-identityhub%3A8183:provider
+      - EDC_IAM_STS_OAUTH_CLIENT_SECRET_ALIAS=regulatory-clearance-provider-sts-client-secret
+      - EDC_VAULT_HASHICORP_URL=http://host.docker.internal:8200
+      - EDC_VAULT_HASHICORP_TOKEN=root
+      - EDC_HOSTNAME=provider-controlplane
+      - WEB_HTTP_PORT=19191
+      - WEB_HTTP_PATH=/api
+      - WEB_HTTP_MANAGEMENT_PORT=19193
+      - WEB_HTTP_MANAGEMENT_PATH=/management
+      - WEB_HTTP_MANAGEMENT_AUTH_KEY=provider-api-key
+      - WEB_HTTP_PROTOCOL_PORT=19292
+      - WEB_HTTP_PROTOCOL_PATH=/protocol
+      - WEB_HTTP_CONTROL_PORT=19194
+      - WEB_HTTP_CONTROL_PATH=/control
+      - EDC_DSP_CALLBACK_ADDRESS=http://provider-controlplane:19292/protocol
+      - edc.iam.trusted-issuer.consumer.id=did:web:consumer-identityhub%3A7083:consumer
+      - 'edc.iam.trusted-issuer.consumer.supportedtypes=["VerifiablePresentation","EnvelopedVerifiablePresentation","VerifiableCredential","EnvelopedVerifiableCredential","MembershipCredential"]'
+      - edc.iam.did.web.use.https=false
+      - edc.iam.trusted-issuer.issuer.id=did:web:issuer-service%3A10016:issuer
+      - 'edc.iam.trusted-issuer.issuer.supportedtypes=["VerifiableCredential","EnvelopedVerifiableCredential","MembershipCredential","BitstringStatusListCredential"]'
+      - edc.iam.credential.revocation.mimetype=application/json
 
   provider-dataplane:
     image: puerto-edc-dataplane:latest
@@ -44,9 +52,11 @@ services:
     ports:
       - "19294:19294"
     environment:
-      EDC_PARTICIPANT_ID: regulatory-clearance-provider
+      EDC_PARTICIPANT_ID: did:web:provider-identityhub%3A8183:provider
       EDC_TRANSFER_PROXY_TOKEN_SIGNER_PRIVATEKEY_ALIAS: private-key
       EDC_TRANSFER_PROXY_TOKEN_VERIFIER_PUBLICKEY_ALIAS: public-key
+      EDC_VAULT_HASHICORP_URL: http://host.docker.internal:8200
+      EDC_VAULT_HASHICORP_TOKEN: root
       EDC_DPF_SELECTOR_URL: http://provider-controlplane:19194/control/v1/dataplanes
       EDC_HOSTNAME: provider-dataplane
       EDC_DATAPLANE_API_PUBLIC_BASEURL: http://provider-dataplane:19294/public
@@ -65,22 +75,30 @@ services:
       - "29292:29292"
       - "29194:29194"
     environment:
-      EDC_PARTICIPANT_ID: transport-company-a
-      EDC_IAM_ISSUER_ID: transport-company-a
-      EDC_IAM_STS_OAUTH_TOKEN_URL: http://host.docker.internal:8080/realms/logistics-dataspace/protocol/openid-connect/token
-      EDC_IAM_STS_OAUTH_CLIENT_ID: edc-consumer-controlplane
-      EDC_IAM_STS_OAUTH_CLIENT_SECRET_ALIAS: edc-consumer-controlplane-secret
-      EDC_HOSTNAME: consumer-controlplane
-      WEB_HTTP_PORT: 29191
-      WEB_HTTP_PATH: /api
-      WEB_HTTP_MANAGEMENT_PORT: 29193
-      WEB_HTTP_MANAGEMENT_PATH: /management
-      WEB_HTTP_MANAGEMENT_AUTH_KEY: consumer-api-key
-      WEB_HTTP_PROTOCOL_PORT: 29292
-      WEB_HTTP_PROTOCOL_PATH: /protocol
-      WEB_HTTP_CONTROL_PORT: 29194
-      WEB_HTTP_CONTROL_PATH: /control
-      EDC_DSP_CALLBACK_ADDRESS: http://consumer-controlplane:29292/protocol
+      - EDC_PARTICIPANT_ID=did:web:consumer-identityhub%3A7083:consumer
+      - EDC_IAM_ISSUER_ID=did:web:consumer-identityhub%3A7083:consumer
+      - EDC_IAM_STS_OAUTH_TOKEN_URL=http://consumer-identityhub:7084/api/sts/token
+      - EDC_IAM_STS_OAUTH_CLIENT_ID=did:web:consumer-identityhub%3A7083:consumer
+      - EDC_IAM_STS_OAUTH_CLIENT_SECRET_ALIAS=transport-company-a-sts-client-secret
+      - EDC_VAULT_HASHICORP_URL=http://host.docker.internal:8200
+      - EDC_VAULT_HASHICORP_TOKEN=root
+      - EDC_HOSTNAME=consumer-controlplane
+      - WEB_HTTP_PORT=29191
+      - WEB_HTTP_PATH=/api
+      - WEB_HTTP_MANAGEMENT_PORT=29193
+      - WEB_HTTP_MANAGEMENT_PATH=/management
+      - WEB_HTTP_MANAGEMENT_AUTH_KEY=consumer-api-key
+      - WEB_HTTP_PROTOCOL_PORT=29292
+      - WEB_HTTP_PROTOCOL_PATH=/protocol
+      - WEB_HTTP_CONTROL_PORT=29194
+      - WEB_HTTP_CONTROL_PATH=/control
+      - EDC_DSP_CALLBACK_ADDRESS=http://consumer-controlplane:29292/protocol
+      - edc.iam.trusted-issuer.provider.id=did:web:provider-identityhub%3A8183:provider
+      - 'edc.iam.trusted-issuer.provider.supportedtypes=["VerifiableCredential","EnvelopedVerifiableCredential","VerifiablePresentation","EnvelopedVerifiablePresentation","MembershipCredential"]'
+      - edc.iam.did.web.use.https=false
+      - edc.iam.trusted-issuer.issuer.id=did:web:issuer-service%3A10016:issuer
+      - 'edc.iam.trusted-issuer.issuer.supportedtypes=["VerifiableCredential","EnvelopedVerifiableCredential","MembershipCredential","BitstringStatusListCredential"]'
+      - edc.iam.credential.revocation.mimetype=application/json
 
   consumer-dataplane:
     image: puerto-edc-dataplane:latest
@@ -88,9 +106,11 @@ services:
     ports:
       - "29294:29294"
     environment:
-      EDC_PARTICIPANT_ID: transport-company-a
+      EDC_PARTICIPANT_ID: did:web:consumer-identityhub%3A7083:consumer
       EDC_TRANSFER_PROXY_TOKEN_SIGNER_PRIVATEKEY_ALIAS: private-key
       EDC_TRANSFER_PROXY_TOKEN_VERIFIER_PUBLICKEY_ALIAS: public-key
+      EDC_VAULT_HASHICORP_URL: http://host.docker.internal:8200
+      EDC_VAULT_HASHICORP_TOKEN: root
       EDC_DPF_SELECTOR_URL: http://consumer-controlplane:29194/control/v1/dataplanes
       EDC_HOSTNAME: consumer-dataplane
       EDC_DATAPLANE_API_PUBLIC_BASEURL: http://consumer-dataplane:29294/public
@@ -106,3 +126,119 @@ services:
     container_name: regulatory-clearance-api
     ports:
       - "8081:8081"
+
+  provider-identityhub:
+    image: puerto-identityhub-mvd:latest
+    container_name: provider-identityhub
+    ports:
+      - "7180:8180"
+      - "7181:8181"
+      - "7182:8182"
+      - "7183:8183"
+      - "7184:8184"
+    volumes:
+      - ./config/provider-identityhub.properties:/app/dataspaceconnector-configuration.properties
+    
+    depends_on:
+      - provider-identityhub-postgres
+
+  consumer-identityhub:
+    image: puerto-identityhub-mvd:latest
+    container_name: consumer-identityhub
+    ports:
+      - "7280:7080"
+      - "7281:7081"
+      - "7282:7082"
+      - "7283:7083"
+      - "7284:7084"
+    volumes:
+      - ./config/consumer-identityhub.properties:/app/dataspaceconnector-configuration.properties
+    
+    depends_on:
+      - consumer-identityhub-postgres
+  
+  provider-identityhub-postgres:
+    image: postgres:16
+    container_name: provider-identityhub-postgres
+    environment:
+      POSTGRES_DB: identityhub
+      POSTGRES_USER: identityhub
+      POSTGRES_PASSWORD: identityhub
+    ports:
+      - "7432:5432"
+
+  consumer-identityhub-postgres:
+    image: postgres:16
+    container_name: consumer-identityhub-postgres
+    environment:
+      POSTGRES_DB: identityhub
+      POSTGRES_USER: identityhub
+      POSTGRES_PASSWORD: identityhub
+    ports:
+      - "7433:5432"
+  
+  issuer-postgres:
+    image: postgres:16
+    container_name: issuer-postgres
+    ports:
+      - "7444:5432"
+    environment:
+      POSTGRES_USER: issuer
+      POSTGRES_PASSWORD: issuer
+      POSTGRES_DB: issuerservice
+
+  issuer-service:
+    image: puerto-issuerservice-mvd:latest
+    container_name: issuer-service
+    ports:
+      - "10010:10010"
+      - "10011:10011"
+      - "10012:10012"
+      - "10013:10013"
+      - "10015:10015"
+      - "10016:10016"
+      - "9999:9999"
+    environment:
+      - edc.hostname=issuer-service
+      - edc.issuer.statuslist.signing.key.alias=statuslist-signing-key
+      - edc.ih.api.superuser.key=c3VwZXItdXNlcg==.c3VwZXItc2VjcmV0LWtleQo=
+      - edc.iam.did.web.use.https=false
+
+      - web.http.port=10010
+      - web.http.path=/api
+      - web.http.sts.port=10011
+      - web.http.sts.path=/api/sts
+      - web.http.issuance.port=10012
+      - web.http.issuance.path=/api/issuance
+      - web.http.issueradmin.port=10013
+      - web.http.issueradmin.path=/api/admin
+      - web.http.identity.port=10015
+      - web.http.identity.path=/api/identity
+      - web.http.did.port=10016
+      - web.http.did.path=/
+      - web.http.statuslist.port=9999
+      - web.http.statuslist.path=/statuslist
+
+      - edc.vault.hashicorp.url=http://host.docker.internal:8200
+      - edc.vault.hashicorp.token=root
+
+      - edc.datasource.default.url=jdbc:postgresql://issuer-postgres:5432/issuerservice
+      - edc.datasource.default.user=issuer
+      - edc.datasource.default.password=issuer
+      - edc.sql.schema.autocreate=true
+
+      - edc.datasource.membership.url=jdbc:postgresql://issuer-postgres:5432/issuerservice
+      - edc.datasource.membership.user=issuer
+      - edc.datasource.membership.password=issuer
+
+      - edc.iam.oauth2.issuer=http://localhost:8080/realms/logistics-dataspace
+      - edc.iam.oauth2.jwks.url=http://host.docker.internal:8080/realms/logistics-dataspace/protocol/openid-connect/certs
+
+      - edc.encryption.aes.key.alias=aes-key-alias
+    depends_on:
+      - issuer-postgres
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:10010/api/check/readiness"]
+      interval: 5s
+      timeout: 5s
+      retries: 20

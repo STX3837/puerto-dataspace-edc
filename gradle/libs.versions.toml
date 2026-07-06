@@ -8,7 +8,9 @@ edc = "0.14.1"
 # SPI modules
 edc-spi-core = { module = "org.eclipse.edc:core-spi", version.ref = "edc" }
 edc-data-plane-selector-control-api = { module = "org.eclipse.edc:data-plane-selector-control-api", version.ref = "edc" }
+edc-data-plane-public-api-v2 = { module = "org.eclipse.edc:data-plane-public-api-v2", version.ref = "edc" }
 edc-jersey-providers-lib = { module = "org.eclipse.edc:jersey-providers-lib", version.ref = "edc" }
+edc-vault-hashicorp = { module = "org.eclipse.edc:vault-hashicorp", version.ref = "edc" }
 
 # BOM modules
 edc-bom-controlplane = { module = "org.eclipse.edc:controlplane-dcp-bom", version.ref = "edc" }

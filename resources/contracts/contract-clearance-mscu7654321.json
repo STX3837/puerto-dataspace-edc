@@ -1,0 +1,16 @@
+﻿{
+  "@context": {
+    "@vocab": "https://w3id.org/edc/v0.0.1/ns/"
+  },
+  "@id": "contract-clearance-mscu7654321",
+  "accessPolicyId": "policy-allow-use",
+  "contractPolicyId": "policy-allow-use",
+  "assetsSelector": [
+    {
+      "@type": "Criterion",
+      "operandLeft": "https://w3id.org/edc/v0.0.1/ns/id",
+      "operator": "=",
+      "operandRight": "asset-clearance-mscu7654321"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+﻿{
+    "@context":  {
+                     "@vocab":  "https://w3id.org/edc/v0.0.1/ns/"
+                 },
+    "@id":  "asset-clearance-mscu7654321",
+    "properties":  {
+                       "name":  "Container Clearance Status - MSCU7654321",
+                       "description":  "Estado regulatorio del contenedor: aduanas, inspección sanitaria y Guardia Civil.",
+                       "contenttype":  "application/json",
+                       "useCase":  "Port Regulatory Clearance",
+                       "containerId":  "MSCU7654321",
+                       "dataCategory":  "ClearanceStatus"
+                   },
+    "dataAddress":  {
+                        "type":  "HttpData",
+                        "baseUrl":  "http://regulatory-clearance-api:8081/containers/MSCU7654321/clearance",
+                        "proxyPath":  "true",
+                        "proxyQueryParams":  "true",
+                        "proxyBody":  "true",
+                        "proxyMethod":  "true"
+                    }
+}

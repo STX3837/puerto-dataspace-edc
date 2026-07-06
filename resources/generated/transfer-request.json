@@ -1,0 +1,12 @@
+﻿{
+  "@context": {
+    "@vocab": "https://w3id.org/edc/v0.0.1/ns/"
+  },
+  "@type": "TransferRequest",
+  "counterPartyId": "did:web:provider-identityhub%3A8183:provider",
+  "counterPartyAddress": "http://provider-controlplane:19292/protocol",
+  "protocol": "dataspace-protocol-http",
+  "assetId": "asset-clearance-mscu7654321",
+  "contractId": "7a9698ac-cc24-4034-af56-696bfd589aec",
+  "transferType": "HttpData-PULL"
+}

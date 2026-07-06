@@ -1,0 +1,26 @@
+﻿{
+  "scopes": [],
+  "serviceEndpoints": [
+    {
+      "type": "CredentialService",
+      "serviceEndpoint": "http://consumer-identityhub:7082/api/credentials/v1/participants/transport-company-a",
+      "id": "consumer-credentialservice-1"
+    },
+    {
+      "type": "ProtocolEndpoint",
+      "serviceEndpoint": "http://consumer-controlplane:29292/protocol",
+      "id": "consumer-dsp"
+    }
+  ],
+  "active": true,
+  "participantId": "did:web:consumer-identityhub%3A7083:consumer",
+  "participantContextId": "transport-company-a",
+  "did": "did:web:consumer-identityhub%3A7083:consumer",
+  "key": {
+    "keyId": "did:web:consumer-identityhub%3A7083:consumer#key-1",
+    "privateKeyAlias": "did:web:consumer-identityhub%3A7083:consumer#key-1",
+    "keyGeneratorParams": {
+      "algorithm": "EC"
+    }
+  }
+}

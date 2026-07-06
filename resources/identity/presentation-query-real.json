@@ -1,0 +1,10 @@
+﻿{
+  "@context": [
+    "https://identity.foundation/presentation-exchange/submission/v1",
+    "https://w3id.org/dspace-dcp/v1.0/dcp.jsonld"
+  ],
+  "@type": "PresentationQueryMessage",
+  "scope": [
+    "org.eclipse.dspace.dcp.vc.type:MembershipCredential:read"
+  ]
+}

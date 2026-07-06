@@ -1,0 +1,8 @@
+﻿{
+  "name": "identity-api:write",
+  "protocol": "openid-connect",
+  "attributes": {
+    "include.in.token.scope": "true",
+    "display.on.consent.screen": "false"
+  }
+}

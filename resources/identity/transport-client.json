@@ -1,0 +1,9 @@
+﻿{
+  "clientId": "transport-company-a",
+  "enabled": true,
+  "protocol": "openid-connect",
+  "publicClient": false,
+  "serviceAccountsEnabled": true,
+  "clientAuthenticatorType": "client-secret",
+  "secret": "transport-secret"
+}

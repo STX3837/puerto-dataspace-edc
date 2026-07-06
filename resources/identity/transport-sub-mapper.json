@@ -1,0 +1,12 @@
+﻿{
+  "name": "force-sub-transport-company-a",
+  "protocol": "openid-connect",
+  "protocolMapper": "oidc-hardcoded-claim-mapper",
+  "config": {
+    "claim.name": "sub",
+    "claim.value": "transport-company-a",
+    "jsonType.label": "String",
+    "access.token.claim": "true",
+    "id.token.claim": "true"
+  }
+}
