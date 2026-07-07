@@ -79,7 +79,7 @@ services:
       - EDC_IAM_ISSUER_ID=did:web:health-identityhub%3A8183:health
       - EDC_IAM_STS_OAUTH_TOKEN_URL=http://health-identityhub:8184/api/sts/token
       - EDC_IAM_STS_OAUTH_CLIENT_ID=did:web:health-identityhub%3A8183:health
-      - EDC_IAM_STS_OAUTH_CLIENT_SECRET_ALIAS=health-provider-sts-client-secret
+      - EDC_IAM_STS_OAUTH_CLIENT_SECRET_ALIAS=health-sts-client-secret
       - EDC_VAULT_HASHICORP_URL=http://host.docker.internal:8200
       - EDC_VAULT_HASHICORP_TOKEN=root
       - EDC_HOSTNAME=health-controlplane
@@ -133,7 +133,7 @@ services:
       - EDC_IAM_ISSUER_ID=did:web:civilguard-identityhub%3A8183:civilguard
       - EDC_IAM_STS_OAUTH_TOKEN_URL=http://civilguard-identityhub:8184/api/sts/token
       - EDC_IAM_STS_OAUTH_CLIENT_ID=did:web:civilguard-identityhub%3A8183:civilguard
-      - EDC_IAM_STS_OAUTH_CLIENT_SECRET_ALIAS=civilguard-provider-sts-client-secret
+      - EDC_IAM_STS_OAUTH_CLIENT_SECRET_ALIAS=civilguard-sts-client-secret
       - EDC_VAULT_HASHICORP_URL=http://host.docker.internal:8200
       - EDC_VAULT_HASHICORP_TOKEN=root
       - EDC_HOSTNAME=civilguard-controlplane

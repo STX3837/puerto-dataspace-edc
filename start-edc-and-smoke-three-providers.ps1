@@ -68,6 +68,20 @@ function Wait-HttpReady($url, $name, $attempts = 30) {
   }
 }
 
+function Wait-PostgresReady($container, $user = "identityhub", $database = "identityhub", $attempts = 30) {
+  for ($i = 1; $i -le $attempts; $i++) {
+    docker exec $container pg_isready -U $user -d $database | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+      Write-Host "$container disponible"
+      return
+    }
+
+    Start-Sleep -Seconds 2
+  }
+
+  throw "$container no esta disponible despues de $attempts intentos"
+}
+
 function Set-ParticipantActive($identityApi, $participantContextId, $token) {
   Invoke-WebRequest `
     -UseBasicParsing `
@@ -215,8 +229,21 @@ Write-Host "1) Arrancando infraestructura EDC..."
 docker compose -f docker-compose.edc.yml up -d `
   consumer-identityhub-postgres provider-identityhub-postgres `
   health-identityhub-postgres civilguard-identityhub-postgres issuer-postgres `
+  mock-api
+
+if ($LASTEXITCODE -ne 0) {
+  throw "No se pudieron arrancar las bases de datos de infraestructura EDC"
+}
+
+Wait-PostgresReady "consumer-identityhub-postgres"
+Wait-PostgresReady "provider-identityhub-postgres"
+Wait-PostgresReady "health-identityhub-postgres"
+Wait-PostgresReady "civilguard-identityhub-postgres"
+Wait-PostgresReady "issuer-postgres" "issuer" "issuerservice"
+
+docker compose -f docker-compose.edc.yml up -d `
   consumer-identityhub provider-identityhub health-identityhub civilguard-identityhub `
-  issuer-service mock-api
+  issuer-service
 
 if ($LASTEXITCODE -ne 0) {
   throw "No se pudo arrancar la infraestructura EDC"

@@ -64,4 +64,6 @@ catalog-response.json
 downloaded-clearance.json
 provider-last.log
 consumer-last.log
+resources/generated/*
+!resources/generated/.gitkeep
 *.log
