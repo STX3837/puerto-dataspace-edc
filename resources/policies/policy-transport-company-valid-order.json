@@ -1,0 +1,35 @@
+{
+  "@context": {
+    "@vocab": "https://w3id.org/edc/v0.0.1/ns/",
+    "odrl": "http://www.w3.org/ns/odrl/2/"
+  },
+  "@id": "policy-transport-company-valid-order",
+  "policy": {
+    "@type": "odrl:Set",
+    "odrl:permission": [
+      {
+        "odrl:action": {
+          "odrl:type": "use"
+        },
+        "odrl:constraint": {
+          "odrl:and": [
+            {
+              "odrl:leftOperand": "TransportCompanyCredential.role",
+              "odrl:operator": {
+                "@id": "odrl:eq"
+              },
+              "odrl:rightOperand": "TransportCompany"
+            },
+            {
+              "odrl:leftOperand": "TransportOrder.activeForContainer",
+              "odrl:operator": {
+                "@id": "odrl:eq"
+              },
+              "odrl:rightOperand": "${containerId}"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

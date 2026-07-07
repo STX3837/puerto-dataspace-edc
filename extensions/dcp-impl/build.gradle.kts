@@ -28,6 +28,7 @@ dependencies {
     compileOnly("org.eclipse.edc:policy-engine-spi:$edcVersion")
     compileOnly("org.eclipse.edc:request-policy-context-spi:$edcVersion")
     compileOnly("org.eclipse.edc:policy-model:$edcVersion")
+    compileOnly("org.eclipse.edc:asset-spi:$edcVersion")
 
     compileOnly("org.eclipse.edc:transform-spi:$edcVersion")
     compileOnly("org.eclipse.edc:transform-lib:$edcVersion")
@@ -41,6 +42,7 @@ dependencies {
     testImplementation("org.eclipse.edc:participant-spi:$edcVersion")
     testImplementation("org.eclipse.edc:policy-engine-spi:$edcVersion")
     testImplementation("org.eclipse.edc:policy-model:$edcVersion")
+    testImplementation("org.eclipse.edc:asset-spi:$edcVersion")
     testImplementation("org.eclipse.edc:request-policy-context-spi:$edcVersion")
     testImplementation("org.eclipse.edc:verifiable-credential-spi:$edcVersion")
     testImplementation("org.eclipse.edc:verifiable-credentials-spi:$edcVersion")

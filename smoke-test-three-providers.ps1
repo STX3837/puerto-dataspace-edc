@@ -68,40 +68,21 @@ function Invoke-ProviderFlow($p) {
 
   $negotiationRequest = Join-Path $GENERATED "contract-negotiation-request-$($p.Name).json"
 
-@"
-{
-  "@context": {
-    "@vocab": "https://w3id.org/edc/v0.0.1/ns/",
-    "odrl": "http://www.w3.org/ns/odrl/2/"
-  },
-  "@type": "ContractRequest",
-  "counterPartyId": "$($p.Did)",
-  "counterPartyAddress": "$($p.Address)",
-  "protocol": "dataspace-protocol-http",
-  "policy": {
-    "@id": "$offerId",
-    "@type": "odrl:Offer",
-    "odrl:assigner": {
-      "@id": "$($p.Did)"
-    },
-    "odrl:target": {
-      "@id": "$($p.AssetId)"
-    },
-    "odrl:permission": [
-      {
-        "odrl:action": {
-          "@id": "use"
-        },
-        "odrl:target": {
-          "@id": "$($p.AssetId)"
-        }
-      }
-    ],
-    "odrl:prohibition": [],
-    "odrl:obligation": []
+  $negotiationPayload = [ordered]@{
+    "@context" = @{
+      "@vocab" = "https://w3id.org/edc/v0.0.1/ns/"
+      "odrl" = "http://www.w3.org/ns/odrl/2/"
+    }
+    "@type" = "ContractRequest"
+    counterPartyId = $p.Did
+    counterPartyAddress = $p.Address
+    protocol = "dataspace-protocol-http"
+    policy = $dataset.'odrl:hasPolicy'
   }
-}
-"@ | Set-Content -LiteralPath $negotiationRequest -Encoding utf8
+
+  $negotiationPayload |
+    ConvertTo-Json -Depth 30 |
+    Set-Content -LiteralPath $negotiationRequest -Encoding utf8
 
   $response = Invoke-WebRequest `
     -UseBasicParsing `

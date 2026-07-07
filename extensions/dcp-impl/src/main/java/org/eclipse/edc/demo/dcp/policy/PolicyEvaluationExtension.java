@@ -15,6 +15,7 @@
 package org.eclipse.edc.demo.dcp.policy;
 
 import org.eclipse.edc.connector.controlplane.catalog.spi.policy.CatalogPolicyContext;
+import org.eclipse.edc.connector.controlplane.asset.spi.index.AssetIndex;
 import org.eclipse.edc.connector.controlplane.contract.spi.policy.ContractNegotiationPolicyContext;
 import org.eclipse.edc.connector.controlplane.contract.spi.policy.TransferProcessPolicyContext;
 import org.eclipse.edc.policy.engine.spi.AtomicConstraintRuleFunction;
@@ -28,6 +29,8 @@ import org.eclipse.edc.spi.system.ServiceExtension;
 import org.eclipse.edc.spi.system.ServiceExtensionContext;
 
 import static org.eclipse.edc.demo.dcp.policy.MembershipCredentialEvaluationFunction.MEMBERSHIP_CONSTRAINT_KEY;
+import static org.eclipse.edc.demo.dcp.policy.TransportCompanyRoleFunction.TRANSPORT_COMPANY_ROLE_KEY;
+import static org.eclipse.edc.demo.dcp.policy.TransportOrderActiveForContainerFunction.TRANSPORT_ORDER_ACTIVE_FOR_CONTAINER_KEY;
 import static org.eclipse.edc.policy.model.OdrlNamespace.ODRL_SCHEMA;
 
 public class PolicyEvaluationExtension implements ServiceExtension {
@@ -38,6 +41,9 @@ public class PolicyEvaluationExtension implements ServiceExtension {
     @Inject
     private RuleBindingRegistry ruleBindingRegistry;
 
+    @Inject
+    private AssetIndex assetIndex;
+
     @Override
     public void initialize(ServiceExtensionContext context) {
 
@@ -46,7 +52,18 @@ public class PolicyEvaluationExtension implements ServiceExtension {
         bindPermissionFunction(MembershipCredentialEvaluationFunction.create(), CatalogPolicyContext.class, CatalogPolicyContext.CATALOG_SCOPE, MEMBERSHIP_CONSTRAINT_KEY);
 
         registerDataAccessLevelFunction();
+        registerTransportCompanyPolicyFunctions();
 
+    }
+
+    private void registerTransportCompanyPolicyFunctions() {
+        bindPermissionFunction(TransportCompanyRoleFunction.create(), TransferProcessPolicyContext.class, TransferProcessPolicyContext.TRANSFER_SCOPE, TRANSPORT_COMPANY_ROLE_KEY);
+        bindPermissionFunction(TransportCompanyRoleFunction.create(), ContractNegotiationPolicyContext.class, ContractNegotiationPolicyContext.NEGOTIATION_SCOPE, TRANSPORT_COMPANY_ROLE_KEY);
+        bindPermissionFunction(TransportCompanyRoleFunction.create(), CatalogPolicyContext.class, CatalogPolicyContext.CATALOG_SCOPE, TRANSPORT_COMPANY_ROLE_KEY);
+
+        bindPermissionFunction(TransportOrderActiveForContainerFunction.create(assetIndex), TransferProcessPolicyContext.class, TransferProcessPolicyContext.TRANSFER_SCOPE, TRANSPORT_ORDER_ACTIVE_FOR_CONTAINER_KEY);
+        bindPermissionFunction(TransportOrderActiveForContainerFunction.create(assetIndex), ContractNegotiationPolicyContext.class, ContractNegotiationPolicyContext.NEGOTIATION_SCOPE, TRANSPORT_ORDER_ACTIVE_FOR_CONTAINER_KEY);
+        bindPermissionFunction(TransportOrderActiveForContainerFunction.create(assetIndex), CatalogPolicyContext.class, CatalogPolicyContext.CATALOG_SCOPE, TRANSPORT_ORDER_ACTIVE_FOR_CONTAINER_KEY);
     }
 
     private void registerDataAccessLevelFunction() {

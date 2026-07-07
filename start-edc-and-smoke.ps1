@@ -5,6 +5,7 @@ Set-Location $PSScriptRoot
 $RESOURCES = Join-Path $PSScriptRoot "resources"
 $ASSET_DEMO = Join-Path $RESOURCES "assets\asset-clearance-mscu7654321.json"
 $POLICY_ALLOW_USE = Join-Path $RESOURCES "policies\policy-allow-use.json"
+$POLICY_TRANSPORT_COMPANY_VALID_ORDER = Join-Path $RESOURCES "policies\policy-transport-company-valid-order.json"
 $CONTRACT_DEMO = Join-Path $RESOURCES "contracts\contract-clearance-mscu7654321.json"
 $CONSUMER_MEMBERSHIP_REQUEST = Join-Path $RESOURCES "identity\consumer-membership-request.json"
 $PROVIDER_MEMBERSHIP_REQUEST = Join-Path $RESOURCES "identity\provider-membership-request.json"
@@ -233,6 +234,7 @@ Write-Host "4) Recargando asset, policy y contract definition..."
 
 Post-Json-Accept409 "http://localhost:19193/management/v3/assets" "provider-api-key" $ASSET_DEMO
 Post-Json-Accept409 "http://localhost:19193/management/v3/policydefinitions" "provider-api-key" $POLICY_ALLOW_USE
+Post-Json-Accept409 "http://localhost:19193/management/v3/policydefinitions" "provider-api-key" $POLICY_TRANSPORT_COMPANY_VALID_ORDER
 Post-Json-Accept409 "http://localhost:19193/management/v3/contractdefinitions" "provider-api-key" $CONTRACT_DEMO
 
 Write-Host "Provider artifacts OK"

@@ -4,6 +4,7 @@ Set-Location $PSScriptRoot
 
 $RESOURCES = Join-Path $PSScriptRoot "resources"
 $POLICY_ALLOW_USE = Join-Path $RESOURCES "policies\policy-allow-use.json"
+$POLICY_TRANSPORT_COMPANY_VALID_ORDER = Join-Path $RESOURCES "policies\policy-transport-company-valid-order.json"
 $CONSUMER_MEMBERSHIP_REQUEST = Join-Path $RESOURCES "identity\consumer-membership-request.json"
 $SMOKE_TEST = Join-Path $PSScriptRoot "smoke-test-three-providers.ps1"
 
@@ -324,6 +325,7 @@ foreach ($provider in $providers) {
   Write-Host "Provisionando artefactos de $($provider.Name)..."
   Post-Json-Accept409 "$($provider.ManagementApi)/v3/assets" "provider-api-key" $provider.Asset
   Post-Json-Accept409 "$($provider.ManagementApi)/v3/policydefinitions" "provider-api-key" $POLICY_ALLOW_USE
+  Post-Json-Accept409 "$($provider.ManagementApi)/v3/policydefinitions" "provider-api-key" $POLICY_TRANSPORT_COMPANY_VALID_ORDER
   Post-Json-Accept409 "$($provider.ManagementApi)/v3/contractdefinitions" "provider-api-key" $provider.Contract
 }
 
