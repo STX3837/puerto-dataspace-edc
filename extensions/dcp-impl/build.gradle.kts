@@ -35,4 +35,22 @@ dependencies {
 
     compileOnly("org.eclipse.edc:catalog-spi:$edcVersion")
     compileOnly("org.eclipse.edc:contract-spi:$edcVersion")
+
+    testImplementation("org.eclipse.edc:core-spi:$edcVersion")
+    testImplementation("org.eclipse.edc:identity-trust-spi:$edcVersion")
+    testImplementation("org.eclipse.edc:participant-spi:$edcVersion")
+    testImplementation("org.eclipse.edc:policy-engine-spi:$edcVersion")
+    testImplementation("org.eclipse.edc:policy-model:$edcVersion")
+    testImplementation("org.eclipse.edc:request-policy-context-spi:$edcVersion")
+    testImplementation("org.eclipse.edc:verifiable-credential-spi:$edcVersion")
+    testImplementation("org.eclipse.edc:verifiable-credentials-spi:$edcVersion")
+
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.3")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.3")
+    testImplementation("org.assertj:assertj-core:3.26.3")
+    testImplementation("org.mockito:mockito-core:5.12.0")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }

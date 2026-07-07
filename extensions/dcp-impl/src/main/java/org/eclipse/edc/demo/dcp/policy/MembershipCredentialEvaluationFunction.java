@@ -20,6 +20,7 @@ import org.eclipse.edc.policy.model.Operator;
 import org.eclipse.edc.policy.model.Permission;
 
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.Map;
 
 public class MembershipCredentialEvaluationFunction<C extends ParticipantAgentPolicyContext> extends AbstractCredentialEvaluationFunction implements AtomicConstraintRuleFunction<Permission, C> {
@@ -37,7 +38,6 @@ public class MembershipCredentialEvaluationFunction<C extends ParticipantAgentPo
         };
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public boolean evaluate(Operator operator, Object rightOperand, Permission permission, C policyContext) {
         if (!operator.equals(Operator.EQ)) {
@@ -59,21 +59,25 @@ public class MembershipCredentialEvaluationFunction<C extends ParticipantAgentPo
             policyContext.reportProblem(credentialResult.getFailureDetail());
             return false;
         }
-        System.err.println("PATCH_MEMBERSHIP_POLICY_REACHED");
-
         return credentialResult.getContent()
                 .stream()
                 .filter(vc -> vc.getType().stream().anyMatch(t -> t.endsWith(MEMBERSHIP_CONSTRAINT_KEY)))
                 .flatMap(vc -> vc.getCredentialSubject().stream().filter(cs -> cs.getClaims().containsKey(MEMBERSHIP_CLAIM)))
                 .anyMatch(credential -> {
-                    var membershipClaim = (Map<String, ?>) credential.getClaims().get(MEMBERSHIP_CLAIM);
-
-                    if (membershipClaim == null || !membershipClaim.containsKey(SINCE_CLAIM)) {
+                    if (!(credential.getClaims().get(MEMBERSHIP_CLAIM) instanceof Map<?, ?> membershipClaim)) {
                         return false;
                     }
 
-                    var membershipStartDate = Instant.parse(membershipClaim.get(SINCE_CLAIM).toString());
-                    return membershipStartDate.isBefore(Instant.now());
+                    var since = membershipClaim.get(SINCE_CLAIM);
+                    if (since == null) {
+                        return false;
+                    }
+
+                    try {
+                        return Instant.parse(since.toString()).isBefore(Instant.now());
+                    } catch (DateTimeParseException ignored) {
+                        return false;
+                    }
                 });
     }
 
