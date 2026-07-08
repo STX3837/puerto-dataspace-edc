@@ -67,6 +67,9 @@ function Invoke-ProviderFlow($p) {
   Write-Host "Offer: $offerId"
 
   $negotiationRequest = Join-Path $GENERATED "contract-negotiation-request-$($p.Name).json"
+  $policy = $dataset.'odrl:hasPolicy'
+  $policy | Add-Member -NotePropertyName "odrl:assigner" -NotePropertyValue @{ "@id" = $p.Did } -Force
+  $policy | Add-Member -NotePropertyName "odrl:target" -NotePropertyValue @{ "@id" = $p.AssetId } -Force
 
   $negotiationPayload = [ordered]@{
     "@context" = @{
@@ -77,7 +80,7 @@ function Invoke-ProviderFlow($p) {
     counterPartyId = $p.Did
     counterPartyAddress = $p.Address
     protocol = "dataspace-protocol-http"
-    policy = $dataset.'odrl:hasPolicy'
+    policy = $policy
   }
 
   $negotiationPayload |
@@ -156,13 +159,30 @@ function Invoke-ProviderFlow($p) {
     throw "Transfer terminada con error en $($p.Name)"
   }
 
+  if ($tp.state -notin @("STARTED", "COMPLETED")) {
+    $tp | ConvertTo-Json -Depth 20
+    throw "Transfer no iniciada en $($p.Name)"
+  }
+
   Write-Host "Transfer: $transferId"
   Write-Host "State: $($tp.state)"
 
-  $edr = Invoke-RestMethod `
-    -Method Get `
-    -Uri "$CONSUMER_MGMT/v3/edrs/$transferId/dataaddress" `
-    -Headers @{ "X-API-Key" = $CONSUMER_KEY }
+  $edr = $null
+  for ($i = 0; $i -lt 20; $i++) {
+    try {
+      $edr = Invoke-RestMethod `
+        -Method Get `
+        -Uri "$CONSUMER_MGMT/v3/edrs/$transferId/dataaddress" `
+        -Headers @{ "X-API-Key" = $CONSUMER_KEY }
+      break
+    }
+    catch {
+      if ($i -eq 19) {
+        throw
+      }
+      Start-Sleep -Seconds 2
+    }
+  }
 
   $edrPath = Join-Path $GENERATED "edr-$($p.Name)-response.json"
   $edr | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $edrPath -Encoding utf8

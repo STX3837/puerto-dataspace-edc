@@ -73,6 +73,7 @@ tasks.register("dockerize", DockerBuildImage::class) {
     dockerFile.set(file("$dockerContextDir/src/main/docker/Dockerfile"))
     images.add("${project.name}:${project.version}")
     images.add("${project.name}:latest")
+    images.add("puerto-edc-controlplane:latest")
     // specify platform with the -Dplatform flag:
     if (System.getProperty("platform") != null)
         platform.set(System.getProperty("platform"))

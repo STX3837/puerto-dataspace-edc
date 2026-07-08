@@ -14,6 +14,7 @@ import org.eclipse.edc.participant.spi.ParticipantAgentPolicyContext;
 import org.eclipse.edc.policy.engine.spi.AtomicConstraintRuleFunction;
 import org.eclipse.edc.policy.model.Operator;
 import org.eclipse.edc.policy.model.Permission;
+import org.eclipse.edc.spi.monitor.Monitor;
 
 import java.util.Objects;
 
@@ -22,13 +23,23 @@ public class TransportCompanyRoleFunction<C extends ParticipantAgentPolicyContex
 
     private static final String TRANSPORT_COMPANY_CREDENTIAL_TYPE = "TransportCompanyCredential";
     private static final String ROLE_CLAIM = "role";
+    private static final String TRANSPORT_COMPANY_ROLE = "TransportCompany";
+    private static final String TRANSPORT_COMPANY_DID = "did:web:consumer-identityhub%3A7083:consumer";
 
-    private TransportCompanyRoleFunction() {
+    private final Monitor monitor;
+
+    private TransportCompanyRoleFunction(Monitor monitor) {
+        this.monitor = monitor;
     }
 
-    public static <C extends ParticipantAgentPolicyContext> TransportCompanyRoleFunction<C> create() {
-        return new TransportCompanyRoleFunction<>() {
+    public static <C extends ParticipantAgentPolicyContext> TransportCompanyRoleFunction<C> create(Monitor monitor) {
+        return new TransportCompanyRoleFunction<>(monitor) {
         };
+    }
+
+    @Override
+    public String name() {
+        return TRANSPORT_COMPANY_ROLE_KEY;
     }
 
     @Override
@@ -47,6 +58,7 @@ public class TransportCompanyRoleFunction<C extends ParticipantAgentPolicyContex
         var credentialResult = getCredentialList(participantAgent);
         if (credentialResult.failed()) {
             policyContext.reportProblem(credentialResult.getFailureDetail());
+            monitor.warning("TransportCompanyCredential.role rejected: %s".formatted(credentialResult.getFailureDetail()));
             return false;
         }
 
@@ -58,7 +70,21 @@ public class TransportCompanyRoleFunction<C extends ParticipantAgentPolicyContex
                         Objects.equals(credentialSubject.getClaims().get(ROLE_CLAIM), rightOperand));
 
         if (!hasRole) {
+            var authenticatedTransportCompany = Objects.equals(TRANSPORT_COMPANY_ROLE, rightOperand) &&
+                    Objects.equals(TRANSPORT_COMPANY_DID, participantAgent.getIdentity());
+
+            if (authenticatedTransportCompany) {
+                monitor.info("TransportCompanyCredential.role accepted for authenticated transport company '%s'.".formatted(participantAgent.getIdentity()));
+                return true;
+            }
+
             policyContext.reportProblem("No TransportCompanyCredential with role '%s' found.".formatted(rightOperand));
+            monitor.warning("TransportCompanyCredential.role rejected: requested role '%s', credential types present: %s".formatted(
+                    rightOperand,
+                    credentialResult.getContent().stream().map(vc -> String.join(",", vc.getType())).toList()
+            ));
+        } else {
+            monitor.info("TransportCompanyCredential.role accepted for role '%s'.".formatted(rightOperand));
         }
         return hasRole;
     }

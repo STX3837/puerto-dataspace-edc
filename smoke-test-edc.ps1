@@ -37,6 +37,10 @@ Write-Host "Offer: $OFFER_ID"
 
 Write-Host "2) Contract negotiation..."
 
+$policy = $dataset.'odrl:hasPolicy'
+$policy | Add-Member -NotePropertyName "odrl:assigner" -NotePropertyValue @{ "@id" = $PROVIDER_DID } -Force
+$policy | Add-Member -NotePropertyName "odrl:target" -NotePropertyValue @{ "@id" = $ASSET_ID } -Force
+
 $negotiationPayload = [ordered]@{
   "@context" = @{
     "@vocab" = "https://w3id.org/edc/v0.0.1/ns/"
@@ -46,7 +50,7 @@ $negotiationPayload = [ordered]@{
   counterPartyId = $PROVIDER_DID
   counterPartyAddress = "http://provider-controlplane:19292/protocol"
   protocol = "dataspace-protocol-http"
-  policy = $dataset.'odrl:hasPolicy'
+  policy = $policy
 }
 
 $negotiationPayload |

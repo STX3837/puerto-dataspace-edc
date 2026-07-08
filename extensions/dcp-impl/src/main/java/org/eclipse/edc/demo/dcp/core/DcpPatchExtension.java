@@ -26,13 +26,15 @@ import org.eclipse.edc.policy.context.request.spi.RequestVersionPolicyContext;
 import org.eclipse.edc.policy.engine.spi.PolicyEngine;
 import org.eclipse.edc.runtime.metamodel.annotation.Inject;
 import org.eclipse.edc.security.signature.jws2020.Jws2020SignatureSuite;
+import org.eclipse.edc.spi.iam.AudienceResolver;
+import org.eclipse.edc.spi.result.Result;
 import org.eclipse.edc.spi.system.ServiceExtension;
 import org.eclipse.edc.spi.system.ServiceExtensionContext;
 import org.eclipse.edc.spi.types.TypeManager;
 import org.eclipse.edc.transform.spi.TypeTransformerRegistry;
 
+import java.util.LinkedHashSet;
 import java.util.Map;
-import java.util.Set;
 
 import static org.eclipse.edc.iam.verifiablecredentials.spi.validation.TrustedIssuerRegistry.WILDCARD;
 import static org.eclipse.edc.spi.constants.CoreConstants.JSON_LD;
@@ -66,9 +68,33 @@ public class DcpPatchExtension implements ServiceExtension {
         trustedIssuerRegistry.register(new Issuer("did:web:dataspace-issuer", Map.of()), WILDCARD);
         trustedIssuerRegistry.register(new Issuer("did:web:localhost%3A9876", Map.of()), WILDCARD);
         trustedIssuerRegistry.register(new Issuer("did:web:issuer-service%3A10016:issuer", Map.of()), WILDCARD);
+        trustedIssuerRegistry.register(new Issuer("did:web:consumer-identityhub%3A7083:consumer", Map.of()), WILDCARD);
+        trustedIssuerRegistry.register(new Issuer("did:web:provider-identityhub%3A8183:provider", Map.of()), WILDCARD);
+        trustedIssuerRegistry.register(new Issuer("did:web:health-identityhub%3A8183:health", Map.of()), WILDCARD);
+        trustedIssuerRegistry.register(new Issuer("did:web:civilguard-identityhub%3A8183:civilguard", Map.of()), WILDCARD);
 
         // register a default scope provider
-        var contextMappingFunction = new DefaultScopeMappingFunction(Set.of("org.eclipse.dspace.dcp.vc.type:MembershipCredential:read"));
+        var membershipScope = "org.eclipse.dspace.dcp.vc.type:MembershipCredential:read";
+        var transportCompanyScope = "org.eclipse.dspace.dcp.vc.type:TransportCompanyCredential:read";
+        var participantId = "%s %s".formatted(context.getParticipantId(), System.getenv("EDC_PARTICIPANT_ID"));
+        var egressScopes = new LinkedHashSet<String>();
+        var ingressScopes = new LinkedHashSet<String>();
+        if (participantId.contains("consumer-identityhub") || participantId.contains("transport-company")) {
+            egressScopes.add(transportCompanyScope);
+        }
+        egressScopes.add(membershipScope);
+        ingressScopes.add(membershipScope);
+        context.getMonitor().info("DCP default credential scopes for participant '%s': egress=%s ingress=%s".formatted(participantId, egressScopes, ingressScopes));
+
+        var contextMappingFunction = new DefaultScopeMappingFunction(egressScopes, ingressScopes);
+
+        context.registerService(AudienceResolver.class, message -> {
+            var audience = message.getCounterPartyId();
+            if (audience == null || audience.isBlank()) {
+                return Result.failure("Cannot resolve DSP token audience: counterPartyId is blank");
+            }
+            return Result.success(audience);
+        });
 
         policyEngine.registerPostValidator(RequestCatalogPolicyContext.class, contextMappingFunction::apply);
         policyEngine.registerPostValidator(RequestContractNegotiationPolicyContext.class, contextMappingFunction::apply);

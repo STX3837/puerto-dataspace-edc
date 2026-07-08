@@ -17,15 +17,22 @@ package org.eclipse.edc.demo.dcp.core;
 import org.eclipse.edc.policy.context.request.spi.RequestPolicyContext;
 import org.eclipse.edc.policy.engine.spi.PolicyValidatorRule;
 import org.eclipse.edc.policy.model.Policy;
+import org.eclipse.edc.spi.iam.RequestContext;
 
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 public class DefaultScopeMappingFunction implements PolicyValidatorRule<RequestPolicyContext> {
-    private final Set<String> defaultScopes;
+    private final Set<String> egressScopes;
+    private final Set<String> ingressScopes;
 
     public DefaultScopeMappingFunction(Set<String> defaultScopes) {
-        this.defaultScopes = defaultScopes;
+        this(defaultScopes, defaultScopes);
+    }
+
+    public DefaultScopeMappingFunction(Set<String> egressScopes, Set<String> ingressScopes) {
+        this.egressScopes = egressScopes;
+        this.ingressScopes = ingressScopes;
     }
 
     @Override
@@ -33,9 +40,33 @@ public class DefaultScopeMappingFunction implements PolicyValidatorRule<RequestP
         var requestScopeBuilder = requestPolicyContext.requestScopeBuilder();
         var rq = requestScopeBuilder.build();
         var existingScope = rq.getScopes();
-        var newScopes = new HashSet<>(defaultScopes);
-        newScopes.addAll(existingScope);
+        var direction = requestPolicyContext.requestContext().getDirection();
+        var defaultScopes = direction == RequestContext.Direction.Egress ? egressScopes : ingressScopes;
+        var newScopes = new LinkedHashSet<>(defaultScopes);
+        if (shouldIncludePolicyScopes(requestPolicyContext)) {
+            newScopes.addAll(existingScope);
+        }
         requestScopeBuilder.scopes(newScopes);
         return true;
+    }
+
+    private boolean shouldIncludePolicyScopes(RequestPolicyContext requestPolicyContext) {
+        var message = requestPolicyContext.requestContext().getMessage();
+        if (message == null) {
+            return true;
+        }
+
+        return switch (message.getClass().getSimpleName()) {
+            case "ContractAgreementMessage",
+                 "ContractAgreementVerificationMessage",
+                 "ContractNegotiationEventMessage",
+                 "ContractNegotiationTerminationMessage",
+                 "ContractOfferMessage",
+                 "TransferStartMessage",
+                 "TransferSuspensionMessage",
+                 "TransferCompletionMessage",
+                 "TransferTerminationMessage" -> false;
+            default -> true;
+        };
     }
 }

@@ -13,11 +13,13 @@ package org.eclipse.edc.demo.dcp.policy;
 import org.eclipse.edc.connector.controlplane.asset.spi.domain.Asset;
 import org.eclipse.edc.connector.controlplane.asset.spi.index.AssetIndex;
 import org.eclipse.edc.connector.controlplane.contract.spi.policy.TransferProcessPolicyContext;
-import org.eclipse.edc.participant.spi.ParticipantAgentPolicyContext;
 import org.eclipse.edc.policy.engine.spi.AtomicConstraintRuleFunction;
+import org.eclipse.edc.policy.engine.spi.DynamicAtomicConstraintRuleFunction;
+import org.eclipse.edc.policy.engine.spi.PolicyContext;
 import org.eclipse.edc.policy.model.Operator;
 import org.eclipse.edc.policy.model.Permission;
 import org.eclipse.edc.spi.query.QuerySpec;
+import org.eclipse.edc.spi.monitor.Monitor;
 
 import java.io.IOException;
 import java.net.URI;
@@ -29,7 +31,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Objects;
 
-public class TransportOrderActiveForContainerFunction<C extends ParticipantAgentPolicyContext> implements AtomicConstraintRuleFunction<Permission, C> {
+public class TransportOrderActiveForContainerFunction<C extends PolicyContext> implements AtomicConstraintRuleFunction<Permission, C>, DynamicAtomicConstraintRuleFunction<Permission, C> {
     public static final String TRANSPORT_ORDER_ACTIVE_FOR_CONTAINER_KEY = "TransportOrder.activeForContainer";
 
     private static final String CONTAINER_ID_PROPERTY = "containerId";
@@ -39,32 +41,53 @@ public class TransportOrderActiveForContainerFunction<C extends ParticipantAgent
 
     private final AssetIndex assetIndex;
     private final HttpClient httpClient;
+    private final Monitor monitor;
 
-    private TransportOrderActiveForContainerFunction(AssetIndex assetIndex, HttpClient httpClient) {
+    private TransportOrderActiveForContainerFunction(AssetIndex assetIndex, HttpClient httpClient, Monitor monitor) {
         this.assetIndex = assetIndex;
         this.httpClient = httpClient;
+        this.monitor = monitor;
     }
 
-    public static <C extends ParticipantAgentPolicyContext> TransportOrderActiveForContainerFunction<C> create(AssetIndex assetIndex) {
+    public static <C extends PolicyContext> TransportOrderActiveForContainerFunction<C> create(AssetIndex assetIndex, Monitor monitor) {
         return new TransportOrderActiveForContainerFunction<>(assetIndex, HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(3))
-                .build());
+                .build(), monitor);
+    }
+
+    @Override
+    public String name() {
+        return TRANSPORT_ORDER_ACTIVE_FOR_CONTAINER_KEY;
     }
 
     @Override
     public boolean evaluate(Operator operator, Object rightOperand, Permission permission, C policyContext) {
+        monitor.info("TransportOrder.activeForContainer evaluating operator '%s' and rightOperand '%s'.".formatted(operator, rightOperand));
+
         if (!operator.equals(Operator.EQ)) {
             policyContext.reportProblem("Cannot evaluate operator %s, only %s is supported".formatted(operator, Operator.EQ));
+            monitor.warning("TransportOrder.activeForContainer rejected unsupported operator '%s'.".formatted(operator));
             return false;
         }
 
         var containerId = resolveContainerId(rightOperand, policyContext);
         if (containerId == null || containerId.isBlank()) {
             policyContext.reportProblem("Could not resolve containerId from asset properties.");
+            monitor.warning("TransportOrder.activeForContainer rejected because containerId could not be resolved.");
             return false;
         }
 
         return validateTransportOrder(containerId, policyContext);
+    }
+
+    @Override
+    public boolean evaluate(Object leftOperand, Operator operator, Object rightOperand, Permission permission, C policyContext) {
+        return evaluate(operator, rightOperand, permission, policyContext);
+    }
+
+    @Override
+    public boolean canHandle(Object leftOperand) {
+        return Objects.equals(TRANSPORT_ORDER_ACTIVE_FOR_CONTAINER_KEY, Objects.toString(leftOperand, null));
     }
 
     private String resolveContainerId(Object rightOperand, C policyContext) {
@@ -77,7 +100,7 @@ public class TransportOrderActiveForContainerFunction<C extends ParticipantAgent
             return null;
         }
 
-        return Objects.toString(asset.getProperty(CONTAINER_ID_PROPERTY), null);
+        return resolveContainerId(asset);
     }
 
     private Asset resolveAsset(C policyContext) {
@@ -87,7 +110,7 @@ public class TransportOrderActiveForContainerFunction<C extends ParticipantAgent
 
         try (var assets = assetIndex.queryAssets(QuerySpec.max())) {
             var matchingAssets = assets
-                    .filter(asset -> asset.getProperty(CONTAINER_ID_PROPERTY) != null)
+                    .filter(asset -> resolveContainerId(asset) != null)
                     .toList();
 
             if (matchingAssets.size() == 1) {
@@ -116,15 +139,34 @@ public class TransportOrderActiveForContainerFunction<C extends ParticipantAgent
             var valid = response.body().replace(" ", "").contains(VALID_ORDER_RESPONSE_FIELD);
             if (!valid) {
                 policyContext.reportProblem("No active transport order found for container '%s'.".formatted(containerId));
+                monitor.warning("TransportOrder.activeForContainer rejected container '%s' with response: %s".formatted(containerId, response.body()));
+            } else {
+                monitor.info("TransportOrder.activeForContainer accepted container '%s'.".formatted(containerId));
             }
             return valid;
         } catch (IOException exception) {
             policyContext.reportProblem("Transport order validation failed for container '%s': %s".formatted(containerId, exception.getMessage()));
+            monitor.warning("TransportOrder.activeForContainer failed for container '%s': %s".formatted(containerId, exception.getMessage()));
             return false;
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             policyContext.reportProblem("Transport order validation interrupted for container '%s'.".formatted(containerId));
+            monitor.warning("TransportOrder.activeForContainer interrupted for container '%s'.".formatted(containerId));
             return false;
         }
+    }
+
+    private String resolveContainerId(Asset asset) {
+        return asset.getProperties().entrySet().stream()
+                .filter(entry -> isContainerIdProperty(Objects.toString(entry.getKey(), null)))
+                .map(entry -> Objects.toString(entry.getValue(), null))
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private boolean isContainerIdProperty(String propertyName) {
+        return CONTAINER_ID_PROPERTY.equals(propertyName) ||
+                propertyName != null && (propertyName.endsWith("/" + CONTAINER_ID_PROPERTY) || propertyName.endsWith("#" + CONTAINER_ID_PROPERTY));
     }
 }

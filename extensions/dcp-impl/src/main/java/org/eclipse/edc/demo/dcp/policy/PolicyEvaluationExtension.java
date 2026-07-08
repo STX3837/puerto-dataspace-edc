@@ -31,6 +31,7 @@ import org.eclipse.edc.spi.system.ServiceExtensionContext;
 import static org.eclipse.edc.demo.dcp.policy.MembershipCredentialEvaluationFunction.MEMBERSHIP_CONSTRAINT_KEY;
 import static org.eclipse.edc.demo.dcp.policy.TransportCompanyRoleFunction.TRANSPORT_COMPANY_ROLE_KEY;
 import static org.eclipse.edc.demo.dcp.policy.TransportOrderActiveForContainerFunction.TRANSPORT_ORDER_ACTIVE_FOR_CONTAINER_KEY;
+import static org.eclipse.edc.policy.engine.spi.PolicyEngine.ALL_SCOPES;
 import static org.eclipse.edc.policy.model.OdrlNamespace.ODRL_SCHEMA;
 
 public class PolicyEvaluationExtension implements ServiceExtension {
@@ -52,18 +53,25 @@ public class PolicyEvaluationExtension implements ServiceExtension {
         bindPermissionFunction(MembershipCredentialEvaluationFunction.create(), CatalogPolicyContext.class, CatalogPolicyContext.CATALOG_SCOPE, MEMBERSHIP_CONSTRAINT_KEY);
 
         registerDataAccessLevelFunction();
-        registerTransportCompanyPolicyFunctions();
+        registerTransportCompanyPolicyFunctions(context);
 
     }
 
-    private void registerTransportCompanyPolicyFunctions() {
-        bindPermissionFunction(TransportCompanyRoleFunction.create(), TransferProcessPolicyContext.class, TransferProcessPolicyContext.TRANSFER_SCOPE, TRANSPORT_COMPANY_ROLE_KEY);
-        bindPermissionFunction(TransportCompanyRoleFunction.create(), ContractNegotiationPolicyContext.class, ContractNegotiationPolicyContext.NEGOTIATION_SCOPE, TRANSPORT_COMPANY_ROLE_KEY);
-        bindPermissionFunction(TransportCompanyRoleFunction.create(), CatalogPolicyContext.class, CatalogPolicyContext.CATALOG_SCOPE, TRANSPORT_COMPANY_ROLE_KEY);
+    private void registerTransportCompanyPolicyFunctions(ServiceExtensionContext context) {
+        context.getMonitor().info("Registering transport company policy functions: %s, %s".formatted(TRANSPORT_COMPANY_ROLE_KEY, TRANSPORT_ORDER_ACTIVE_FOR_CONTAINER_KEY));
 
-        bindPermissionFunction(TransportOrderActiveForContainerFunction.create(assetIndex), TransferProcessPolicyContext.class, TransferProcessPolicyContext.TRANSFER_SCOPE, TRANSPORT_ORDER_ACTIVE_FOR_CONTAINER_KEY);
-        bindPermissionFunction(TransportOrderActiveForContainerFunction.create(assetIndex), ContractNegotiationPolicyContext.class, ContractNegotiationPolicyContext.NEGOTIATION_SCOPE, TRANSPORT_ORDER_ACTIVE_FOR_CONTAINER_KEY);
-        bindPermissionFunction(TransportOrderActiveForContainerFunction.create(assetIndex), CatalogPolicyContext.class, CatalogPolicyContext.CATALOG_SCOPE, TRANSPORT_ORDER_ACTIVE_FOR_CONTAINER_KEY);
+        bindPermissionFunction(TransportCompanyRoleFunction.create(context.getMonitor()), TransferProcessPolicyContext.class, TransferProcessPolicyContext.TRANSFER_SCOPE, TRANSPORT_COMPANY_ROLE_KEY);
+        bindPermissionFunction(TransportCompanyRoleFunction.create(context.getMonitor()), ContractNegotiationPolicyContext.class, ContractNegotiationPolicyContext.NEGOTIATION_SCOPE, TRANSPORT_COMPANY_ROLE_KEY);
+        bindPermissionFunction(TransportCompanyRoleFunction.create(context.getMonitor()), CatalogPolicyContext.class, CatalogPolicyContext.CATALOG_SCOPE, TRANSPORT_COMPANY_ROLE_KEY);
+
+        bindPermissionConstraint(TransferProcessPolicyContext.TRANSFER_SCOPE, TRANSPORT_ORDER_ACTIVE_FOR_CONTAINER_KEY);
+        bindPermissionConstraint(ContractNegotiationPolicyContext.NEGOTIATION_SCOPE, TRANSPORT_ORDER_ACTIVE_FOR_CONTAINER_KEY);
+        bindPermissionConstraint(CatalogPolicyContext.CATALOG_SCOPE, TRANSPORT_ORDER_ACTIVE_FOR_CONTAINER_KEY);
+
+        policyEngine.registerFunction(TransferProcessPolicyContext.class, Permission.class, TransportOrderActiveForContainerFunction.create(assetIndex, context.getMonitor()));
+        policyEngine.registerFunction(ContractNegotiationPolicyContext.class, Permission.class, TransportOrderActiveForContainerFunction.create(assetIndex, context.getMonitor()));
+        policyEngine.registerFunction(CatalogPolicyContext.class, Permission.class, TransportOrderActiveForContainerFunction.create(assetIndex, context.getMonitor()));
+        policyEngine.registerFunction(PolicyContext.class, Permission.class, TransportOrderActiveForContainerFunction.create(assetIndex, context.getMonitor()));
     }
 
     private void registerDataAccessLevelFunction() {
@@ -75,17 +83,23 @@ public class PolicyEvaluationExtension implements ServiceExtension {
     }
 
     private <C extends PolicyContext> void bindPermissionFunction(AtomicConstraintRuleFunction<Permission, C> function, Class<C> contextClass, String scope, String constraintType) {
+        bindPermissionConstraint(scope, constraintType);
+
+        policyEngine.registerFunction(contextClass, Permission.class, constraintType, function);
+    }
+
+    private void bindPermissionConstraint(String scope, String constraintType) {
         ruleBindingRegistry.bind("use", scope);
         ruleBindingRegistry.bind(ODRL_SCHEMA + "use", scope);
         ruleBindingRegistry.bind(constraintType, scope);
-
-        policyEngine.registerFunction(contextClass, Permission.class, constraintType, function);
+        ruleBindingRegistry.bind(constraintType, ALL_SCOPES);
     }
 
     private <C extends PolicyContext> void bindDutyFunction(AtomicConstraintRuleFunction<Duty, C> function, Class<C> contextClass, String scope, String constraintType) {
         ruleBindingRegistry.bind("use", scope);
         ruleBindingRegistry.bind(ODRL_SCHEMA + "use", scope);
         ruleBindingRegistry.bind(constraintType, scope);
+        ruleBindingRegistry.bind(constraintType, ALL_SCOPES);
 
         policyEngine.registerFunction(contextClass, Duty.class, constraintType, function);
     }
