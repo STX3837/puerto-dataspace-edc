@@ -23,6 +23,8 @@ import java.util.Set;
 class DataAccessCredentialScopeExtractor implements ScopeExtractor {
     public static final String DATA_PROCESSOR_CREDENTIAL_TYPE = "DataProcessorCredential";
     private static final String DATA_ACCESS_CONSTRAINT_PREFIX = "DataAccess.";
+    private static final String TRANSPORT_COMPANY_CREDENTIAL_TYPE = "TransportCompanyCredential";
+    private static final String TRANSPORT_COMPANY_CONSTRAINT_PREFIX = "TransportCompanyCredential.";
     private static final String CREDENTIAL_TYPE_NAMESPACE = "org.eclipse.dspace.dcp.vc.type";
 
     @Override
@@ -31,6 +33,8 @@ class DataAccessCredentialScopeExtractor implements ScopeExtractor {
         if (leftValue instanceof String leftOperand) {
             if (leftOperand.startsWith(DATA_ACCESS_CONSTRAINT_PREFIX)) {
                 scopes = Set.of("%s:%s:read".formatted(CREDENTIAL_TYPE_NAMESPACE, DATA_PROCESSOR_CREDENTIAL_TYPE));
+            } else if (leftOperand.startsWith(TRANSPORT_COMPANY_CONSTRAINT_PREFIX)) {
+                scopes = Set.of("%s:%s:read".formatted(CREDENTIAL_TYPE_NAMESPACE, TRANSPORT_COMPANY_CREDENTIAL_TYPE));
             }
         }
         return scopes;

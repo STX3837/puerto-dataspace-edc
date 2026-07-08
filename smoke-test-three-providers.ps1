@@ -67,41 +67,25 @@ function Invoke-ProviderFlow($p) {
   Write-Host "Offer: $offerId"
 
   $negotiationRequest = Join-Path $GENERATED "contract-negotiation-request-$($p.Name).json"
+  $policy = $dataset.'odrl:hasPolicy'
+  $policy | Add-Member -NotePropertyName "odrl:assigner" -NotePropertyValue @{ "@id" = $p.Did } -Force
+  $policy | Add-Member -NotePropertyName "odrl:target" -NotePropertyValue @{ "@id" = $p.AssetId } -Force
 
-@"
-{
-  "@context": {
-    "@vocab": "https://w3id.org/edc/v0.0.1/ns/",
-    "odrl": "http://www.w3.org/ns/odrl/2/"
-  },
-  "@type": "ContractRequest",
-  "counterPartyId": "$($p.Did)",
-  "counterPartyAddress": "$($p.Address)",
-  "protocol": "dataspace-protocol-http",
-  "policy": {
-    "@id": "$offerId",
-    "@type": "odrl:Offer",
-    "odrl:assigner": {
-      "@id": "$($p.Did)"
-    },
-    "odrl:target": {
-      "@id": "$($p.AssetId)"
-    },
-    "odrl:permission": [
-      {
-        "odrl:action": {
-          "@id": "use"
-        },
-        "odrl:target": {
-          "@id": "$($p.AssetId)"
-        }
-      }
-    ],
-    "odrl:prohibition": [],
-    "odrl:obligation": []
+  $negotiationPayload = [ordered]@{
+    "@context" = @{
+      "@vocab" = "https://w3id.org/edc/v0.0.1/ns/"
+      "odrl" = "http://www.w3.org/ns/odrl/2/"
+    }
+    "@type" = "ContractRequest"
+    counterPartyId = $p.Did
+    counterPartyAddress = $p.Address
+    protocol = "dataspace-protocol-http"
+    policy = $policy
   }
-}
-"@ | Set-Content -LiteralPath $negotiationRequest -Encoding utf8
+
+  $negotiationPayload |
+    ConvertTo-Json -Depth 30 |
+    Set-Content -LiteralPath $negotiationRequest -Encoding utf8
 
   $response = Invoke-WebRequest `
     -UseBasicParsing `
@@ -175,13 +159,30 @@ function Invoke-ProviderFlow($p) {
     throw "Transfer terminada con error en $($p.Name)"
   }
 
+  if ($tp.state -notin @("STARTED", "COMPLETED")) {
+    $tp | ConvertTo-Json -Depth 20
+    throw "Transfer no iniciada en $($p.Name)"
+  }
+
   Write-Host "Transfer: $transferId"
   Write-Host "State: $($tp.state)"
 
-  $edr = Invoke-RestMethod `
-    -Method Get `
-    -Uri "$CONSUMER_MGMT/v3/edrs/$transferId/dataaddress" `
-    -Headers @{ "X-API-Key" = $CONSUMER_KEY }
+  $edr = $null
+  for ($i = 0; $i -lt 20; $i++) {
+    try {
+      $edr = Invoke-RestMethod `
+        -Method Get `
+        -Uri "$CONSUMER_MGMT/v3/edrs/$transferId/dataaddress" `
+        -Headers @{ "X-API-Key" = $CONSUMER_KEY }
+      break
+    }
+    catch {
+      if ($i -eq 19) {
+        throw
+      }
+      Start-Sleep -Seconds 2
+    }
+  }
 
   $edrPath = Join-Path $GENERATED "edr-$($p.Name)-response.json"
   $edr | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $edrPath -Encoding utf8
@@ -212,15 +213,15 @@ $civilguard = Invoke-ProviderFlow $providers[2]
 
 $blockingAuthorities = @()
 
-if ($customs.customsStatus -ne "CLEARED") {
+if ($customs.status -ne "CLEARED") {
   $blockingAuthorities += "CUSTOMS"
 }
 
-if ($health.healthInspectionStatus -ne "CLEARED") {
+if ($health.status -ne "CLEARED") {
   $blockingAuthorities += "HEALTH_INSPECTION"
 }
 
-if ($civilguard.civilGuardStatus -ne "CLEARED") {
+if ($civilguard.status -ne "CLEARED") {
   $blockingAuthorities += "CIVIL_GUARD"
 }
 
@@ -232,9 +233,9 @@ $overallStatus = if ($blockingAuthorities.Count -eq 0) {
 
 $aggregate = [ordered]@{
   containerId = "MSCU7654321"
-  customsStatus = $customs.customsStatus
-  healthInspectionStatus = $health.healthInspectionStatus
-  civilGuardStatus = $civilguard.civilGuardStatus
+  customsStatus = $customs.status
+  healthInspectionStatus = $health.status
+  civilGuardStatus = $civilguard.status
   overallStatus = $overallStatus
   blockingAuthorities = $blockingAuthorities
   lastUpdatedAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")

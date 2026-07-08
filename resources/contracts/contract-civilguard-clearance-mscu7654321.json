@@ -3,8 +3,8 @@
     "@vocab": "https://w3id.org/edc/v0.0.1/ns/"
   },
   "@id": "contract-civilguard-clearance-mscu7654321",
-  "accessPolicyId": "policy-allow-use",
-  "contractPolicyId": "policy-allow-use",
+  "accessPolicyId": "policy-transport-company-valid-order",
+  "contractPolicyId": "policy-transport-company-valid-order",
   "assetsSelector": [
     {
       "@type": "Criterion",

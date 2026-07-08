@@ -28,6 +28,14 @@ class DataAccessCredentialScopeExtractorTest {
     }
 
     @Test
+    void shouldExtractTransportCompanyCredentialScopeForTransportCompanyConstraint() {
+        var scopes = extractor.extractScopes("TransportCompanyCredential.role", Operator.EQ, "TransportCompany", null);
+
+        assertThat(scopes)
+                .containsExactly("org.eclipse.dspace.dcp.vc.type:TransportCompanyCredential:read");
+    }
+
+    @Test
     void shouldNotExtractScopeForUnrelatedOrNonStringConstraint() {
         assertThat(extractor.extractScopes("MembershipCredential", Operator.EQ, "active", null))
                 .isEmpty();

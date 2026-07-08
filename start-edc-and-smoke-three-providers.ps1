@@ -4,7 +4,11 @@ Set-Location $PSScriptRoot
 
 $RESOURCES = Join-Path $PSScriptRoot "resources"
 $POLICY_ALLOW_USE = Join-Path $RESOURCES "policies\policy-allow-use.json"
+$POLICY_TRANSPORT_COMPANY_VALID_ORDER = Join-Path $RESOURCES "policies\policy-transport-company-valid-order.json"
 $CONSUMER_MEMBERSHIP_REQUEST = Join-Path $RESOURCES "identity\consumer-membership-request.json"
+$CONSUMER_TRANSPORT_COMPANY_REQUEST = Join-Path $RESOURCES "identity\consumer-transportcompany-request.json"
+$TRANSPORT_COMPANY_CREDENTIAL_DEFINITION = Join-Path $RESOURCES "identity\transport-company-credential-definition.json"
+$TRANSPORT_COMPANY_ATTESTATION = Join-Path $RESOURCES "identity\transport-company-attestation.json"
 $CONSUMER_PARTICIPANT = Join-Path $RESOURCES "identity\consumer-participant-recreate.json"
 $ISSUER_PARTICIPANT = Join-Path $RESOURCES "identity\issuer-participant.json"
 $SMOKE_TEST = Join-Path $PSScriptRoot "smoke-test-three-providers.ps1"
@@ -141,6 +145,32 @@ function Get-IssuedCredentialCount($databaseContainer) {
   return [int]$result.Trim()
 }
 
+function Get-IssuedCredentialObjectCount($databaseContainer, $credentialObjectId) {
+  $result = docker exec $databaseContainer psql `
+    -U identityhub `
+    -d identityhub `
+    -t `
+    -A `
+    -c "select count(*) from credential_resource where vc_state=500 and metadata->>'credentialObjectId'='$credentialObjectId';"
+
+  if ($LASTEXITCODE -ne 0) {
+    throw "No se pudo consultar credential_resource en $databaseContainer"
+  }
+
+  return [int]$result.Trim()
+}
+
+function Remove-StaleCredentialObjects($databaseContainer, $credentialObjectId) {
+  docker exec $databaseContainer psql `
+    -U identityhub `
+    -d identityhub `
+    -c "with keep as (select id from credential_resource where vc_state=500 and metadata->>'credentialObjectId'='$credentialObjectId' order by create_timestamp desc limit 1) delete from credential_resource where metadata->>'credentialObjectId'='$credentialObjectId' and id not in (select id from keep);" | Out-Null
+
+  if ($LASTEXITCODE -ne 0) {
+    throw "No se pudieron limpiar credenciales antiguas en $databaseContainer"
+  }
+}
+
 function Clear-HolderCredentialState($databaseContainer) {
   docker exec $databaseContainer psql `
     -U identityhub `
@@ -161,6 +191,101 @@ function Clear-IssuerCredentialState {
   if ($LASTEXITCODE -ne 0) {
     throw "No se pudo limpiar el estado de credenciales en issuer-postgres"
   }
+}
+
+function Ensure-TransportCompanyCredentialDefinition($token) {
+  $definitionId = "transport-company-credential-def"
+  $definitionUrl = "http://localhost:10013/api/admin/v1beta/participants/issuer/credentialdefinitions/$definitionId"
+
+  try {
+    Invoke-WebRequest `
+      -UseBasicParsing `
+      -Method Post `
+      -Uri "http://localhost:10013/api/admin/v1beta/participants/issuer/attestations" `
+      -Headers @{ Authorization = "Bearer $token" } `
+      -ContentType "application/json" `
+      -InFile $TRANSPORT_COMPANY_ATTESTATION | Out-Null
+  }
+  catch {
+    if ($_.Exception.Response.StatusCode.value__ -ne 409) {
+      throw
+    }
+  }
+
+  $holderPayload = @{
+    holderId = "did:web:consumer-identityhub%3A7083:consumer"
+    did = "did:web:consumer-identityhub%3A7083:consumer"
+    holderName = "transport-company-a"
+    properties = @{
+      id = "did:web:consumer-identityhub%3A7083:consumer"
+      role = "TransportCompany"
+      companyId = "TC-A"
+    }
+  } | ConvertTo-Json -Depth 8
+
+  try {
+    Invoke-WebRequest `
+      -UseBasicParsing `
+      -Method Post `
+      -Uri "http://localhost:10013/api/admin/v1beta/participants/issuer/holders" `
+      -Headers @{ Authorization = "Bearer $token" } `
+      -ContentType "application/json" `
+      -Body $holderPayload | Out-Null
+  }
+  catch {
+    if ($_.Exception.Response.StatusCode.value__ -ne 409) {
+      throw
+    }
+  }
+
+  try {
+    Invoke-WebRequest `
+      -UseBasicParsing `
+      -Method Post `
+      -Uri "http://localhost:10013/api/admin/v1beta/participants/issuer/credentialdefinitions" `
+      -Headers @{ Authorization = "Bearer $token" } `
+      -ContentType "application/json" `
+      -InFile $TRANSPORT_COMPANY_CREDENTIAL_DEFINITION | Out-Null
+  }
+  catch {
+    if ($_.Exception.Response.StatusCode.value__ -ne 409) {
+      throw
+    }
+  }
+
+  Write-Host "TransportCompanyCredential definition registrada"
+}
+
+function Ensure-TransportCompanyCredential($databaseContainer, $requestTemplate, $token) {
+  Remove-StaleCredentialObjects $databaseContainer "transport-company-credential-def"
+
+  if ((Get-IssuedCredentialObjectCount $databaseContainer "transport-company-credential-def") -gt 0) {
+    Write-Host "Consumer: TransportCompanyCredential ya emitida"
+    return
+  }
+
+  $request = Get-Content -LiteralPath $requestTemplate -Raw | ConvertFrom-Json
+  $request.holderPid = "transport-company-a-transportcompany-$([guid]::NewGuid())"
+  $payload = $request | ConvertTo-Json -Depth 20
+
+  Invoke-WebRequest `
+    -UseBasicParsing `
+    -Method Post `
+    -Uri "http://localhost:7281/api/identity/v1beta/participants/transport-company-a/credentials/request" `
+    -Headers @{ Authorization = "Bearer $token" } `
+    -ContentType "application/json" `
+    -Body $payload | Out-Null
+
+  for ($i = 1; $i -le 30; $i++) {
+    if ((Get-IssuedCredentialObjectCount $databaseContainer "transport-company-credential-def") -gt 0) {
+      Write-Host "Consumer: TransportCompanyCredential emitida"
+      return
+    }
+
+    Start-Sleep -Seconds 2
+  }
+
+  throw "Consumer: la TransportCompanyCredential no llego al estado ISSUED (vc_state=500)"
 }
 
 function Test-VaultSecretExists($secretAlias) {
@@ -222,7 +347,9 @@ function Ensure-MembershipCredential(
   $participantFile = $null,
   $repairAttempted = $false
 ) {
-  if ((Get-IssuedCredentialCount $databaseContainer) -gt 0) {
+  Remove-StaleCredentialObjects $databaseContainer "membership-credential-def"
+
+  if ((Get-IssuedCredentialObjectCount $databaseContainer "membership-credential-def") -gt 0) {
     Write-Host "${name}: MembershipCredential ya emitida"
     return
   }
@@ -240,7 +367,8 @@ function Ensure-MembershipCredential(
     -Body $payload | Out-Null
 
   for ($i = 1; $i -le 30; $i++) {
-    if ((Get-IssuedCredentialCount $databaseContainer) -gt 0) {
+    Remove-StaleCredentialObjects $databaseContainer "membership-credential-def"
+    if ((Get-IssuedCredentialObjectCount $databaseContainer "membership-credential-def") -gt 0) {
       Write-Host "${name}: MembershipCredential emitida"
       return
     }
@@ -404,6 +532,21 @@ if (-not $identityToken) {
   throw "Keycloak no devolvió el token de ih-provisioner"
 }
 
+$issuerAdminTokenResponse = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://localhost:8080/realms/logistics-dataspace/protocol/openid-connect/token" `
+  -ContentType "application/x-www-form-urlencoded" `
+  -Body @{
+    grant_type = "client_credentials"
+    client_id = "issuer"
+    client_secret = "issuer-secret"
+  }
+
+$issuerAdminToken = $issuerAdminTokenResponse.access_token
+if (-not $issuerAdminToken) {
+  throw "Keycloak no devolvio el token de issuer"
+}
+
 Write-Host "Comprobando claves privadas de participantes en Vault..."
 $participantsReprovisioned = $false
 $issuerReprovisioned = Ensure-ParticipantPrivateKey `
@@ -496,7 +639,25 @@ foreach ($provider in $providers) {
 
 Write-Host "MembershipCredentials OK"
 
-Write-Host "3) Arrancando ControlPlanes y DataPlanes..."
+Write-Host "2.1) Provisionando TransportCompanyCredential del consumer..."
+
+Ensure-TransportCompanyCredentialDefinition $issuerAdminToken
+Ensure-TransportCompanyCredential `
+  "consumer-identityhub-postgres" `
+  $CONSUMER_TRANSPORT_COMPANY_REQUEST `
+  $identityToken
+
+Write-Host "TransportCompanyCredential OK"
+
+Write-Host "3) Construyendo imagen ControlPlane..."
+
+& .\gradlew.bat :runtimes:controlplane:dockerize --no-daemon
+
+if ($LASTEXITCODE -ne 0) {
+  throw "No se pudo construir la imagen puerto-edc-controlplane:latest"
+}
+
+Write-Host "4) Arrancando ControlPlanes y DataPlanes..."
 
 docker compose -f docker-compose.edc.yml up -d --force-recreate `
   consumer-controlplane consumer-dataplane `
@@ -511,18 +672,19 @@ if ($LASTEXITCODE -ne 0) {
 Start-Sleep -Seconds 15
 Ensure-TransferProxyKeys
 
-Write-Host "4) Recargando assets, policies y contract definitions..."
+Write-Host "5) Recargando assets, policies y contract definitions..."
 
 foreach ($provider in $providers) {
   Write-Host "Provisionando artefactos de $($provider.Name)..."
   Post-Json-Accept409 "$($provider.ManagementApi)/v3/assets" "provider-api-key" $provider.Asset
   Post-Json-Accept409 "$($provider.ManagementApi)/v3/policydefinitions" "provider-api-key" $POLICY_ALLOW_USE
+  Post-Json-Accept409 "$($provider.ManagementApi)/v3/policydefinitions" "provider-api-key" $POLICY_TRANSPORT_COMPANY_VALID_ORDER
   Post-Json-Accept409 "$($provider.ManagementApi)/v3/contractdefinitions" "provider-api-key" $provider.Contract
 }
 
 Write-Host "Provider artifacts OK"
 
-Write-Host "5) Verificando Data Planes..."
+Write-Host "6) Verificando Data Planes..."
 
 foreach ($provider in $providers) {
   $dataPlanes = docker exec $provider.DataPlane `
@@ -535,7 +697,7 @@ foreach ($provider in $providers) {
   Write-Host "$($provider.Name) DataPlane OK"
 }
 
-Write-Host "6) Ejecutando smoke test de tres providers..."
+Write-Host "7) Ejecutando smoke test de tres providers..."
 
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $SMOKE_TEST
 

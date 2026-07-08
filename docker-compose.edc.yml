@@ -40,10 +40,10 @@ services:
       - WEB_HTTP_CONTROL_PATH=/control
       - EDC_DSP_CALLBACK_ADDRESS=http://provider-controlplane:19292/protocol
       - edc.iam.trusted-issuer.consumer.id=did:web:consumer-identityhub%3A7083:consumer
-      - 'edc.iam.trusted-issuer.consumer.supportedtypes=["VerifiablePresentation","EnvelopedVerifiablePresentation","VerifiableCredential","EnvelopedVerifiableCredential","MembershipCredential"]'
+      - 'edc.iam.trusted-issuer.consumer.supportedtypes=["VerifiablePresentation","EnvelopedVerifiablePresentation","VerifiableCredential","EnvelopedVerifiableCredential","MembershipCredential","TransportCompanyCredential","BitstringStatusListCredential"]'
       - edc.iam.did.web.use.https=false
       - edc.iam.trusted-issuer.issuer.id=did:web:issuer-service%3A10016:issuer
-      - 'edc.iam.trusted-issuer.issuer.supportedtypes=["VerifiableCredential","EnvelopedVerifiableCredential","MembershipCredential","BitstringStatusListCredential"]'
+      - 'edc.iam.trusted-issuer.issuer.supportedtypes=["VerifiableCredential","EnvelopedVerifiableCredential","MembershipCredential","TransportCompanyCredential","BitstringStatusListCredential"]'
       - edc.iam.credential.revocation.mimetype=application/json
 
   provider-dataplane:
@@ -94,10 +94,10 @@ services:
       - WEB_HTTP_CONTROL_PATH=/control
       - EDC_DSP_CALLBACK_ADDRESS=http://health-controlplane:19292/protocol
       - edc.iam.trusted-issuer.consumer.id=did:web:consumer-identityhub%3A7083:consumer
-      - 'edc.iam.trusted-issuer.consumer.supportedtypes=["VerifiablePresentation","EnvelopedVerifiablePresentation","VerifiableCredential","EnvelopedVerifiableCredential","MembershipCredential"]'
+      - 'edc.iam.trusted-issuer.consumer.supportedtypes=["VerifiablePresentation","EnvelopedVerifiablePresentation","VerifiableCredential","EnvelopedVerifiableCredential","MembershipCredential","TransportCompanyCredential","BitstringStatusListCredential"]'
       - edc.iam.did.web.use.https=false
       - edc.iam.trusted-issuer.issuer.id=did:web:issuer-service%3A10016:issuer
-      - 'edc.iam.trusted-issuer.issuer.supportedtypes=["VerifiableCredential","EnvelopedVerifiableCredential","MembershipCredential","BitstringStatusListCredential"]'
+      - 'edc.iam.trusted-issuer.issuer.supportedtypes=["VerifiableCredential","EnvelopedVerifiableCredential","MembershipCredential","TransportCompanyCredential","BitstringStatusListCredential"]'
       - edc.iam.credential.revocation.mimetype=application/json
 
   health-dataplane:
@@ -148,10 +148,10 @@ services:
       - WEB_HTTP_CONTROL_PATH=/control
       - EDC_DSP_CALLBACK_ADDRESS=http://civilguard-controlplane:19292/protocol
       - edc.iam.trusted-issuer.consumer.id=did:web:consumer-identityhub%3A7083:consumer
-      - 'edc.iam.trusted-issuer.consumer.supportedtypes=["VerifiablePresentation","EnvelopedVerifiablePresentation","VerifiableCredential","EnvelopedVerifiableCredential","MembershipCredential"]'
+      - 'edc.iam.trusted-issuer.consumer.supportedtypes=["VerifiablePresentation","EnvelopedVerifiablePresentation","VerifiableCredential","EnvelopedVerifiableCredential","MembershipCredential","TransportCompanyCredential","BitstringStatusListCredential"]'
       - edc.iam.did.web.use.https=false
       - edc.iam.trusted-issuer.issuer.id=did:web:issuer-service%3A10016:issuer
-      - 'edc.iam.trusted-issuer.issuer.supportedtypes=["VerifiableCredential","EnvelopedVerifiableCredential","MembershipCredential","BitstringStatusListCredential"]'
+      - 'edc.iam.trusted-issuer.issuer.supportedtypes=["VerifiableCredential","EnvelopedVerifiableCredential","MembershipCredential","TransportCompanyCredential","BitstringStatusListCredential"]'
       - edc.iam.credential.revocation.mimetype=application/json
 
   civilguard-dataplane:
@@ -202,14 +202,14 @@ services:
       - WEB_HTTP_CONTROL_PATH=/control
       - EDC_DSP_CALLBACK_ADDRESS=http://consumer-controlplane:29292/protocol
       - edc.iam.trusted-issuer.provider.id=did:web:provider-identityhub%3A8183:provider
-      - 'edc.iam.trusted-issuer.provider.supportedtypes=["VerifiableCredential","EnvelopedVerifiableCredential","VerifiablePresentation","EnvelopedVerifiablePresentation","MembershipCredential"]'
+      - 'edc.iam.trusted-issuer.provider.supportedtypes=["VerifiableCredential","EnvelopedVerifiableCredential","VerifiablePresentation","EnvelopedVerifiablePresentation","MembershipCredential","BitstringStatusListCredential"]'
       - edc.iam.trusted-issuer.health.id=did:web:health-identityhub%3A8183:health
-      - 'edc.iam.trusted-issuer.health.supportedtypes=["VerifiableCredential","EnvelopedVerifiableCredential","VerifiablePresentation","EnvelopedVerifiablePresentation","MembershipCredential"]'
+      - 'edc.iam.trusted-issuer.health.supportedtypes=["VerifiableCredential","EnvelopedVerifiableCredential","VerifiablePresentation","EnvelopedVerifiablePresentation","MembershipCredential","BitstringStatusListCredential"]'
       - edc.iam.trusted-issuer.civilguard.id=did:web:civilguard-identityhub%3A8183:civilguard
-      - 'edc.iam.trusted-issuer.civilguard.supportedtypes=["VerifiableCredential","EnvelopedVerifiableCredential","VerifiablePresentation","EnvelopedVerifiablePresentation","MembershipCredential"]'
+      - 'edc.iam.trusted-issuer.civilguard.supportedtypes=["VerifiableCredential","EnvelopedVerifiableCredential","VerifiablePresentation","EnvelopedVerifiablePresentation","MembershipCredential","BitstringStatusListCredential"]'
       - edc.iam.did.web.use.https=false
       - edc.iam.trusted-issuer.issuer.id=did:web:issuer-service%3A10016:issuer
-      - 'edc.iam.trusted-issuer.issuer.supportedtypes=["VerifiableCredential","EnvelopedVerifiableCredential","MembershipCredential","BitstringStatusListCredential"]'
+      - 'edc.iam.trusted-issuer.issuer.supportedtypes=["VerifiableCredential","EnvelopedVerifiableCredential","MembershipCredential","TransportCompanyCredential","BitstringStatusListCredential"]'
       - edc.iam.credential.revocation.mimetype=application/json
 
   consumer-dataplane:

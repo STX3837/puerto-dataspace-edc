@@ -14,7 +14,7 @@
   },
   "dataAddress": {
     "type": "HttpData",
-    "baseUrl": "http://regulatory-clearance-api:8081/containers/MSCU7654321/clearance",
+    "baseUrl": "http://regulatory-clearance-api:8081/containers/MSCU7654321/health-inspection",
     "proxyPath": "true",
     "proxyQueryParams": "true",
     "proxyBody": "true",

@@ -1,0 +1,11 @@
+{
+  "issuerDid": "did:web:issuer-service%3A10016:issuer",
+  "holderPid": "consumer-transportcompany-request",
+  "credentials": [
+    {
+      "format": "vc11-sl2021/jwt",
+      "type": "TransportCompanyCredential",
+      "id": "transport-company-credential-def"
+    }
+  ]
+}

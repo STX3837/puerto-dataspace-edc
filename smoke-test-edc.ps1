@@ -37,40 +37,25 @@ Write-Host "Offer: $OFFER_ID"
 
 Write-Host "2) Contract negotiation..."
 
-@"
-{
-  "@context": {
-    "@vocab": "https://w3id.org/edc/v0.0.1/ns/",
-    "odrl": "http://www.w3.org/ns/odrl/2/"
-  },
-  "@type": "ContractRequest",
-  "counterPartyId": "$PROVIDER_DID",
-  "counterPartyAddress": "http://provider-controlplane:19292/protocol",
-  "protocol": "dataspace-protocol-http",
-  "policy": {
-    "@id": "$OFFER_ID",
-    "@type": "odrl:Offer",
-    "odrl:assigner": {
-      "@id": "$PROVIDER_DID"
-    },
-    "odrl:target": {
-      "@id": "$ASSET_ID"
-    },
-    "odrl:permission": [
-      {
-        "odrl:action": {
-          "@id": "use"
-        },
-        "odrl:target": {
-          "@id": "$ASSET_ID"
-        }
-      }
-    ],
-    "odrl:prohibition": [],
-    "odrl:obligation": []
+$policy = $dataset.'odrl:hasPolicy'
+$policy | Add-Member -NotePropertyName "odrl:assigner" -NotePropertyValue @{ "@id" = $PROVIDER_DID } -Force
+$policy | Add-Member -NotePropertyName "odrl:target" -NotePropertyValue @{ "@id" = $ASSET_ID } -Force
+
+$negotiationPayload = [ordered]@{
+  "@context" = @{
+    "@vocab" = "https://w3id.org/edc/v0.0.1/ns/"
+    "odrl" = "http://www.w3.org/ns/odrl/2/"
   }
+  "@type" = "ContractRequest"
+  counterPartyId = $PROVIDER_DID
+  counterPartyAddress = "http://provider-controlplane:19292/protocol"
+  protocol = "dataspace-protocol-http"
+  policy = $policy
 }
-"@ | Set-Content -LiteralPath $NEGOTIATION_REQUEST -Encoding utf8
+
+$negotiationPayload |
+  ConvertTo-Json -Depth 30 |
+  Set-Content -LiteralPath $NEGOTIATION_REQUEST -Encoding utf8
 
 $response = Invoke-WebRequest `
   -UseBasicParsing `
