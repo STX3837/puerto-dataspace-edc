@@ -4,26 +4,29 @@ Prototipo de Espacio de Datos portuario construido con Eclipse Dataspace
 Components (EDC), Dataspace Protocol (DSP) y Decentralized Claims Protocol
 (DCP).
 
-El escenario representa la autorización de retirada de un contenedor. Un
-consumer consulta y combina información procedente de tres providers:
+El proyecto representa la autorización de retirada de un contenedor. Un Consumer,
+que actúa como empresa transportista, consulta y combina información procedente
+de tres Providers:
 
 - **Customs**: autorización aduanera.
 - **Health**: inspección sanitaria.
 - **CivilGuard**: autorización de Guardia Civil.
 
 El contenedor queda disponible para su retirada únicamente cuando los tres
-providers responden con estado `CLEARED`.
+Providers responden con estado `CLEARED`.
 
 ## Arquitectura
 
 ```mermaid
 flowchart LR
-    KC[Keycloak<br/>OAuth2] --> CIH[Consumer Identity Hub]
+    KCPG[Keycloak PostgreSQL] --> KC[Keycloak<br/>realm logistics-dataspace]
+    KC --> CIH[Consumer Identity Hub]
     KC --> PIH1[Customs Identity Hub]
     KC --> PIH2[Health Identity Hub]
     KC --> PIH3[CivilGuard Identity Hub]
+    KC --> IS[Issuer Service]
 
-    IS[Issuer Service<br/>MembershipCredential] --> CIH
+    IS[Issuer Service<br/>MembershipCredential + TransportCompanyCredential] --> CIH
     IS --> PIH1
     IS --> PIH2
     IS --> PIH3
@@ -59,12 +62,55 @@ flowchart LR
     CDP -. transferencia PULL .-> DP3
 ```
 
-Cada participante dispone de un Control Plane, un Data Plane y un Identity
-Hub con PostgreSQL independiente. El Issuer Service emite una
-`MembershipCredential` para cada participante. Durante catálogo y negociación,
-DCP utiliza esas credenciales para autenticar y autorizar a las contrapartes.
+Cada participante dispone de un Control Plane, un Data Plane y un Identity Hub
+con PostgreSQL independiente. El Issuer Service emite una
+`MembershipCredential` para cada participante y una
+`TransportCompanyCredential` para el Consumer. Durante catálogo, negociación y
+transferencia, DCP utiliza esas credenciales para autenticar y autorizar a las
+contrapartes.
 
-### Participantes
+## Infraestructura base
+
+La infraestructura común está definida en
+[`docker-compose.infra.yml`](docker-compose.infra.yml). Este compose levanta:
+
+- `keycloak-postgres`: base de datos PostgreSQL de Keycloak.
+- `keycloak`: servidor Keycloak accesible en `http://localhost:8080`.
+- `vault`: HashiCorp Vault en modo desarrollo, accesible en
+  `http://localhost:8200`, con token `root`.
+
+Keycloak usa PostgreSQL y arranca con import automático del realm:
+
+```yaml
+command: start-dev --import-realm
+volumes:
+  - ./infra/keycloak/import:/opt/keycloak/data/import
+```
+
+El fichero importado es
+[`infra/keycloak/import/realm-export.json`](infra/keycloak/import/realm-export.json)
+y contiene el realm `logistics-dataspace` con los clients, client scopes,
+asociaciones de scopes, roles y secrets de demo necesarios para Identity Hub e
+Issuer Service.
+
+Para un usuario nuevo, basta con arrancar la infraestructura desde la raíz del
+repositorio:
+
+```powershell
+docker compose -f .\docker-compose.infra.yml up -d
+```
+
+Para levantar infraestructura y servicios EDC en una sola orden:
+
+```powershell
+docker compose -f .\docker-compose.infra.yml -f .\docker-compose.edc.yml up -d
+```
+
+> Importante: no ejecutes `docker compose down -v` si quieres conservar datos.
+> La opción `-v` elimina volúmenes, incluido el PostgreSQL de Keycloak y las
+> bases de datos del proyecto.
+
+## Participantes
 
 | Participante | DID | Asset |
 |---|---|---|
@@ -72,11 +118,11 @@ DCP utiliza esas credenciales para autenticar y autorizar a las contrapartes.
 | Customs | `did:web:provider-identityhub%3A8183:provider` | `asset-clearance-mscu7654321` |
 | Health | `did:web:health-identityhub%3A8183:health` | `asset-health-clearance-mscu7654321` |
 | CivilGuard | `did:web:civilguard-identityhub%3A8183:civilguard` | `asset-civilguard-clearance-mscu7654321` |
-| Issuer | `did:web:issuer-service%3A10016:issuer` | Emite `MembershipCredential` |
+| Issuer | `did:web:issuer-service%3A10016:issuer` | Emite `MembershipCredential` y `TransportCompanyCredential` |
 
-### Puertos principales
+## Puertos principales
 
-| Stack | Identity Hub | Management API | DSP | Control API | Data Plane público | PostgreSQL |
+| Stack | Identity Hub | Management API | DSP | Control API | Data Plane publico | PostgreSQL |
 |---|---:|---:|---:|---:|---:|---:|
 | Consumer | `7280-7284` | `29193` | `29292` | `29194` | `29294` | `7433` |
 | Customs | `7180-7184` | `19193` | `19292` | `19194` | `19294` | `7432` |
@@ -89,42 +135,56 @@ Otros servicios:
 |---|---|
 | Regulatory Clearance Mock API | `8081` |
 | Keycloak | `8080` |
+| Keycloak PostgreSQL | `5432` |
 | HashiCorp Vault | `8200` |
-| Issuer Service | `10010`, `10012`, `10013`, `10015`, `10016`, `9999` |
+| Issuer Service | `10010`, `10011`, `10012`, `10013`, `10015`, `10016`, `9999` |
 | Issuer PostgreSQL | `7444` |
 
-La definición completa está en
+La infraestructura común está en
+[`docker-compose.infra.yml`](docker-compose.infra.yml). Los componentes EDC,
+Identity Hub, Issuer Service, Mock API y PostgreSQL propios del proyecto están en
 [`docker-compose.edc.yml`](docker-compose.edc.yml).
+
+## Usage Policy actual
+
+En el flujo completo, el Consumer solo puede consultar el estado del contenedor
+si cumple todas estas condiciones:
+
+- Está autenticado vía DCP frente al Provider.
+- Tiene una `MembershipCredential` activa emitida por el Issuer Service.
+- Tiene una `TransportCompanyCredential` con `role = TransportCompany`.
+- Demuestra una orden de transporte activa para el `containerId` del asset.
+
+El `containerId` se resuelve desde las propiedades del asset. Para la demo, el
+contenedor principal es:
+
+```text
+MSCU7654321
+```
+
+La validación de orden activa se realiza contra el Mock API de regulatory
+clearance, que expone datos de demostración para el transportista del Consumer.
 
 ## Requisitos
 
 - Windows con Docker Desktop en ejecución.
 - Windows PowerShell 5.1 o PowerShell 7.
-- Puertos de la tabla anterior disponibles.
-- Las siguientes imágenes locales:
+- Puertos de las tablas anteriores disponibles.
+- Imágenes locales del proyecto:
 
   - `puerto-edc-controlplane:latest`
   - `puerto-edc-dataplane:latest`
   - `puerto-identityhub-mvd:latest`
   - `puerto-issuerservice-mvd:latest`
 
-- Keycloak accesible en `http://localhost:8080`, con:
+El realm de Keycloak se importa desde
+`infra/keycloak/import/realm-export.json` al arrancar
+`docker-compose.infra.yml`. El script de validación crea o repara en Vault las
+claves privadas de participantes y las claves `private-key` y `public-key` del
+Transfer Proxy cuando no existen. No construye todas las imágenes personalizadas
+desde cero, salvo la imagen del Control Plane durante el flujo principal.
 
-  - realm `logistics-dataspace`;
-  - cliente de servicio `ih-provisioner`;
-  - secreto `ih-provisioner-secret`;
-  - participantes y scopes de Identity Hub provisionados.
-
-- Vault accesible en `http://localhost:8200` con token de desarrollo `root` y
-  los secretos STS de los participantes.
-- Issuer Service provisionado con el participante `issuer`, los holders y la
-  definición `membership-credential-def`.
-
-El script crea las claves `private-key` y `public-key` del Transfer Proxy en
-Vault cuando no existen. No crea el realm de Keycloak ni las imágenes
-personalizadas.
-
-Para comprobar rápidamente las dependencias:
+Para comprobar rápidamente las dependencias principales:
 
 ```powershell
 docker image inspect puerto-edc-controlplane:latest | Out-Null
@@ -136,28 +196,41 @@ Invoke-WebRequest -UseBasicParsing http://localhost:8200/v1/sys/health
 Invoke-WebRequest -UseBasicParsing http://localhost:8080/realms/logistics-dataspace
 ```
 
-## Arranque y validación completa
+## Arranque recomendado
 
-Desde la raíz del repositorio:
+Desde la raíz del repositorio, arranca primero Keycloak, PostgreSQL de Keycloak
+y Vault:
+
+```powershell
+docker compose -f .\docker-compose.infra.yml up -d
+```
+
+Después ejecuta el flujo completo de provisionado y smoke test:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\start-edc-and-smoke-three-providers.ps1
 ```
 
-Este es el comando principal del proyecto. El script
+Este es el comando principal de validación del proyecto. El script
 [`start-edc-and-smoke-three-providers.ps1`](start-edc-and-smoke-three-providers.ps1)
 realiza automáticamente:
 
-1. Arranque de PostgreSQL, Identity Hubs, Issuer Service y Mock API.
-2. Espera activa hasta que los Identity Hubs estén disponibles.
-3. Activación de los participantes.
-4. Emisión de las `MembershipCredential` que falten.
-5. Arranque o recreación de todos los Control Planes y Data Planes.
-6. Provisión de las claves del Transfer Proxy en Vault.
-7. Registro de assets, policies y contract definitions en los tres providers.
-8. Comprobación de que los tres Data Planes están `AVAILABLE`.
-9. Ejecución de
-   [`smoke-test-three-providers.ps1`](smoke-test-three-providers.ps1).
+1. Arranque de PostgreSQL de Identity Hubs, PostgreSQL de Issuer Service,
+   Identity Hubs, Issuer Service y Mock API.
+2. Espera activa hasta que los Identity Hubs y el Issuer Service estén
+   disponibles.
+3. Obtención de tokens OAuth2 desde Keycloak usando el realm
+   `logistics-dataspace`.
+4. Activación y, si hace falta, reprovisionado de los participantes.
+5. Emisión de las `MembershipCredential` que falten.
+6. Registro y emisión de la `TransportCompanyCredential` del Consumer.
+7. Construcción de la imagen `puerto-edc-controlplane:latest`.
+8. Arranque o recreación de todos los Control Planes y Data Planes.
+9. Provisión de las claves del Transfer Proxy en Vault.
+10. Registro de assets, policies y contract definitions en los tres Providers.
+11. Comprobación de que los tres Data Planes estan `AVAILABLE`.
+12. Ejecución de
+    [`smoke-test-three-providers.ps1`](smoke-test-three-providers.ps1).
 
 El smoke test solicita los tres catálogos, negocia tres contratos, inicia tres
 transferencias `HttpData-PULL`, descarga los datos y genera el resultado
@@ -191,16 +264,19 @@ Los artefactos de ejecución se escriben en `resources/generated/`:
 - `contract-negotiation-request-*.json`: solicitudes de negociación.
 - `transfer-request-*.json`: solicitudes de transferencia.
 - `edr-*-response.json`: Endpoint Data References.
-- `downloaded-*-clearance.json`: datos descargados de cada provider.
+- `downloaded-*-clearance.json`: datos descargados de cada Provider.
 - `aggregated-clearance-status.json`: resultado final consolidado.
 
 ## Tests unitarios
 
 Los tests unitarios validan la lógica DCP sin necesidad de levantar Docker:
 
-- extracción del scope `DataProcessorCredential`;
+- extracción de scopes DCP para `MembershipCredential` y
+  `TransportCompanyCredential`;
 - combinación de scopes requeridos y existentes;
 - aceptación de una `MembershipCredential` activa;
+- validación de `TransportCompanyCredential.role`;
+- validación de `TransportOrder.activeForContainer`;
 - rechazo de operadores, operands, fechas futuras, credenciales ausentes y
   claims malformados.
 
@@ -221,18 +297,42 @@ publica los informes HTML y JUnit como el artefacto `unit-test-reports`.
 
 ## Diagnóstico
 
-Estado de los contenedores:
+Estado de la infraestructura base:
+
+```powershell
+docker compose -f .\docker-compose.infra.yml ps
+```
+
+Estado de los servicios EDC:
 
 ```powershell
 docker compose -f .\docker-compose.edc.yml ps
 ```
 
-Logs de un componente:
+Estado conjunto de infra + EDC:
 
 ```powershell
+docker compose -f .\docker-compose.infra.yml -f .\docker-compose.edc.yml ps
+```
+
+Logs de componentes habituales:
+
+```powershell
+docker logs keycloak --since 10m
+docker logs vault --since 10m
 docker logs consumer-controlplane --since 10m
+docker logs provider-controlplane --since 10m
 docker logs health-controlplane --since 10m
 docker logs civilguard-controlplane --since 10m
+```
+
+Comprobar endpoints básicos:
+
+```powershell
+Invoke-WebRequest -UseBasicParsing http://localhost:8080/realms/logistics-dataspace
+Invoke-WebRequest -UseBasicParsing http://localhost:8200/v1/sys/health
+Invoke-WebRequest -UseBasicParsing http://localhost:7280/api/check/readiness
+Invoke-WebRequest -UseBasicParsing http://localhost:10010/api/check/readiness
 ```
 
 Ejecutar únicamente la validación, sin recrear el stack:
@@ -241,11 +341,17 @@ Ejecutar únicamente la validación, sin recrear el stack:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\smoke-test-three-providers.ps1
 ```
 
-Detener los servicios definidos por el proyecto:
+Detener solo los servicios EDC:
 
 ```powershell
 docker compose -f .\docker-compose.edc.yml down
 ```
 
-Este último comando no detiene Keycloak ni Vault cuando se ejecutan como
-contenedores externos al Compose.
+Detener infraestructura y EDC conservando volúmenes:
+
+```powershell
+docker compose -f .\docker-compose.infra.yml -f .\docker-compose.edc.yml down
+```
+
+No uses `down -v` salvo que quieras borrar de forma explícita el estado
+persistido del proyecto.
