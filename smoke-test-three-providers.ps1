@@ -213,15 +213,15 @@ $civilguard = Invoke-ProviderFlow $providers[2]
 
 $blockingAuthorities = @()
 
-if ($customs.customsStatus -ne "CLEARED") {
+if ($customs.status -ne "CLEARED") {
   $blockingAuthorities += "CUSTOMS"
 }
 
-if ($health.healthInspectionStatus -ne "CLEARED") {
+if ($health.status -ne "CLEARED") {
   $blockingAuthorities += "HEALTH_INSPECTION"
 }
 
-if ($civilguard.civilGuardStatus -ne "CLEARED") {
+if ($civilguard.status -ne "CLEARED") {
   $blockingAuthorities += "CIVIL_GUARD"
 }
 
@@ -233,9 +233,9 @@ $overallStatus = if ($blockingAuthorities.Count -eq 0) {
 
 $aggregate = [ordered]@{
   containerId = "MSCU7654321"
-  customsStatus = $customs.customsStatus
-  healthInspectionStatus = $health.healthInspectionStatus
-  civilGuardStatus = $civilguard.civilGuardStatus
+  customsStatus = $customs.status
+  healthInspectionStatus = $health.status
+  civilGuardStatus = $civilguard.status
   overallStatus = $overallStatus
   blockingAuthorities = $blockingAuthorities
   lastUpdatedAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
