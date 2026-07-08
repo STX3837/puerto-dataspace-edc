@@ -5,6 +5,8 @@ Set-Location $PSScriptRoot
 $RESOURCES = Join-Path $PSScriptRoot "resources"
 $POLICY_ALLOW_USE = Join-Path $RESOURCES "policies\policy-allow-use.json"
 $CONSUMER_MEMBERSHIP_REQUEST = Join-Path $RESOURCES "identity\consumer-membership-request.json"
+$CONSUMER_PARTICIPANT = Join-Path $RESOURCES "identity\consumer-participant-recreate.json"
+$ISSUER_PARTICIPANT = Join-Path $RESOURCES "identity\issuer-participant.json"
 $SMOKE_TEST = Join-Path $PSScriptRoot "smoke-test-three-providers.ps1"
 
 $providers = @(
@@ -13,6 +15,7 @@ $providers = @(
     IdentityReadiness = "http://localhost:7180/api/check/readiness"
     IdentityApi = "http://localhost:7181/api/identity"
     ParticipantContextId = "regulatory-clearance-provider"
+    Participant = Join-Path $RESOURCES "identity\provider-participant.json"
     Database = "provider-identityhub-postgres"
     MembershipRequest = Join-Path $RESOURCES "identity\provider-membership-request.json"
     ManagementApi = "http://localhost:19193/management"
@@ -26,6 +29,7 @@ $providers = @(
     IdentityReadiness = "http://localhost:7380/api/check/readiness"
     IdentityApi = "http://localhost:7381/api/identity"
     ParticipantContextId = "health"
+    Participant = Join-Path $RESOURCES "identity\health-participant.json"
     Database = "health-identityhub-postgres"
     MembershipRequest = Join-Path $RESOURCES "identity\health-membership-request.json"
     ManagementApi = "http://localhost:21193/management"
@@ -39,6 +43,7 @@ $providers = @(
     IdentityReadiness = "http://localhost:7480/api/check/readiness"
     IdentityApi = "http://localhost:7481/api/identity"
     ParticipantContextId = "civilguard"
+    Participant = Join-Path $RESOURCES "identity\civilguard-participant.json"
     Database = "civilguard-identityhub-postgres"
     MembershipRequest = Join-Path $RESOURCES "identity\civilguard-membership-request.json"
     ManagementApi = "http://localhost:22193/management"
@@ -91,6 +96,36 @@ function Set-ParticipantActive($identityApi, $participantContextId, $token) {
     -ContentType "application/json" | Out-Null
 }
 
+function Reset-Participant($identityApi, $participantContextId, $participantFile, $token) {
+  $participantUrl = "$identityApi/v1beta/participants/$participantContextId"
+
+  try {
+    Invoke-WebRequest `
+      -UseBasicParsing `
+      -Method Delete `
+      -Uri $participantUrl `
+      -Headers @{ Authorization = "Bearer $token" } | Out-Null
+  }
+  catch {
+    $status = $_.Exception.Response.StatusCode.value__
+    if ($status -ne 404) {
+      throw
+    }
+  }
+
+  Invoke-WebRequest `
+    -UseBasicParsing `
+    -Method Post `
+    -Uri "$identityApi/v1beta/participants" `
+    -Headers @{ Authorization = "Bearer $token" } `
+    -ContentType "application/json" `
+    -InFile $participantFile | Out-Null
+
+  Set-ParticipantActive $identityApi $participantContextId $token
+  Start-Sleep -Seconds 5
+  Write-Host "$participantContextId reprovisionado"
+}
+
 function Get-IssuedCredentialCount($databaseContainer) {
   $result = docker exec $databaseContainer psql `
     -U identityhub `
@@ -106,13 +141,86 @@ function Get-IssuedCredentialCount($databaseContainer) {
   return [int]$result.Trim()
 }
 
+function Clear-HolderCredentialState($databaseContainer) {
+  docker exec $databaseContainer psql `
+    -U identityhub `
+    -d identityhub `
+    -c "delete from credential_resource; delete from edc_holder_credentialrequest;" | Out-Null
+
+  if ($LASTEXITCODE -ne 0) {
+    throw "No se pudo limpiar el estado de credenciales en $databaseContainer"
+  }
+}
+
+function Clear-IssuerCredentialState {
+  docker exec issuer-postgres psql `
+    -U issuer `
+    -d issuerservice `
+    -c "delete from credential_resource; delete from edc_issuance_process;" | Out-Null
+
+  if ($LASTEXITCODE -ne 0) {
+    throw "No se pudo limpiar el estado de credenciales en issuer-postgres"
+  }
+}
+
+function Test-VaultSecretExists($secretAlias) {
+  $vaultKey = [uri]::EscapeDataString($secretAlias)
+  $vaultPath = [uri]::EscapeDataString($vaultKey)
+
+  try {
+    Invoke-RestMethod `
+      -Uri "http://localhost:8200/v1/secret/data/$vaultPath" `
+      -Headers @{ "X-Vault-Token" = "root" } | Out-Null
+
+    return $true
+  }
+  catch {
+    return $false
+  }
+}
+
+function Get-ParticipantPrivateKeyAlias($participantFile) {
+  $participant = Get-Content -LiteralPath $participantFile -Raw | ConvertFrom-Json
+  return $participant.key.privateKeyAlias
+}
+
+function Ensure-ParticipantPrivateKey($name, $identityApi, $participantContextId, $participantFile, $token) {
+  $privateKeyAlias = Get-ParticipantPrivateKeyAlias $participantFile
+
+  if (Test-VaultSecretExists $privateKeyAlias) {
+    Write-Host "${name}: clave privada ya existe en Vault"
+    return $false
+  }
+
+  Write-Host "${name}: clave privada no existe en Vault; reprovisionando participante"
+  Reset-Participant $identityApi $participantContextId $participantFile $token
+  return $true
+}
+
+function Get-LatestHolderCredentialRequestError($databaseContainer) {
+  $result = docker exec $databaseContainer psql `
+    -U identityhub `
+    -d identityhub `
+    -t `
+    -A `
+    -c "select coalesce(error_detail, '') from edc_holder_credentialrequest order by created_at desc limit 1;"
+
+  if ($LASTEXITCODE -ne 0) {
+    return ""
+  }
+
+  return ($result -join "`n").Trim()
+}
+
 function Ensure-MembershipCredential(
   $name,
   $identityApi,
   $participantContextId,
   $databaseContainer,
   $requestTemplate,
-  $token
+  $token,
+  $participantFile = $null,
+  $repairAttempted = $false
 ) {
   if ((Get-IssuedCredentialCount $databaseContainer) -gt 0) {
     Write-Host "${name}: MembershipCredential ya emitida"
@@ -140,7 +248,30 @@ function Ensure-MembershipCredential(
     Start-Sleep -Seconds 2
   }
 
-  throw "${name}: la MembershipCredential no llegó al estado ISSUED (vc_state=500)"
+  $latestError = Get-LatestHolderCredentialRequestError $databaseContainer
+  if (-not $repairAttempted `
+      -and $participantFile `
+      -and $latestError -match "Private key with ID '.+' not found") {
+    Write-Host "${name}: clave privada ausente en Vault; reprovisionando participante"
+    Reset-Participant $identityApi $participantContextId $participantFile $token
+    Clear-HolderCredentialState $databaseContainer
+    Ensure-MembershipCredential `
+      $name `
+      $identityApi `
+      $participantContextId `
+      $databaseContainer `
+      $requestTemplate `
+      $token `
+      $participantFile `
+      $true
+    return
+  }
+
+  if ($latestError) {
+    throw "${name}: la MembershipCredential no llego al estado ISSUED (vc_state=500). Ultimo error: $latestError"
+  }
+
+  throw "${name}: la MembershipCredential no llego al estado ISSUED (vc_state=500)"
 }
 
 function Ensure-TransferProxyKeys {
@@ -273,6 +404,66 @@ if (-not $identityToken) {
   throw "Keycloak no devolvió el token de ih-provisioner"
 }
 
+Write-Host "Comprobando claves privadas de participantes en Vault..."
+$participantsReprovisioned = $false
+$issuerReprovisioned = Ensure-ParticipantPrivateKey `
+  "Issuer" `
+  "http://localhost:10015/api/identity" `
+  "issuer" `
+  $ISSUER_PARTICIPANT `
+  $identityToken
+
+if ($issuerReprovisioned) {
+  $participantsReprovisioned = $true
+  Clear-IssuerCredentialState
+  Clear-HolderCredentialState "consumer-identityhub-postgres"
+  foreach ($provider in $providers) {
+    Clear-HolderCredentialState $provider.Database
+  }
+}
+
+$consumerReprovisioned = Ensure-ParticipantPrivateKey `
+  "Consumer" `
+  "http://localhost:7281/api/identity" `
+  "transport-company-a" `
+  $CONSUMER_PARTICIPANT `
+  $identityToken
+
+if ($consumerReprovisioned) {
+  $participantsReprovisioned = $true
+  Clear-HolderCredentialState "consumer-identityhub-postgres"
+}
+
+foreach ($provider in $providers) {
+  $providerReprovisioned = Ensure-ParticipantPrivateKey `
+    $provider.Name `
+    $provider.IdentityApi `
+    $provider.ParticipantContextId `
+    $provider.Participant `
+    $identityToken
+
+  if ($providerReprovisioned) {
+    $participantsReprovisioned = $true
+    Clear-HolderCredentialState $provider.Database
+  }
+}
+
+if ($participantsReprovisioned) {
+  docker compose -f docker-compose.edc.yml restart `
+    issuer-service consumer-identityhub provider-identityhub health-identityhub civilguard-identityhub
+
+  if ($LASTEXITCODE -ne 0) {
+    throw "No se pudieron reiniciar los Identity Hubs tras reprovisionar participantes"
+  }
+
+  Wait-HttpReady "http://localhost:7280/api/check/readiness" "Consumer Identity Hub"
+  Wait-HttpReady "http://localhost:10010/api/check/readiness" "Issuer Service"
+
+  foreach ($provider in $providers) {
+    Wait-HttpReady $provider.IdentityReadiness "$($provider.Name) Identity Hub"
+  }
+}
+
 Set-ParticipantActive "http://localhost:10015/api/identity" "issuer" $identityToken
 Set-ParticipantActive "http://localhost:7281/api/identity" "transport-company-a" $identityToken
 
@@ -289,7 +480,8 @@ Ensure-MembershipCredential `
   "transport-company-a" `
   "consumer-identityhub-postgres" `
   $CONSUMER_MEMBERSHIP_REQUEST `
-  $identityToken
+  $identityToken `
+  $CONSUMER_PARTICIPANT
 
 foreach ($provider in $providers) {
   Ensure-MembershipCredential `
@@ -298,7 +490,8 @@ foreach ($provider in $providers) {
     $provider.ParticipantContextId `
     $provider.Database `
     $provider.MembershipRequest `
-    $identityToken
+    $identityToken `
+    $provider.Participant
 }
 
 Write-Host "MembershipCredentials OK"
