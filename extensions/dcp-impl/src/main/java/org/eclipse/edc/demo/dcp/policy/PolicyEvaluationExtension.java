@@ -14,8 +14,8 @@
 
 package org.eclipse.edc.demo.dcp.policy;
 
-import org.eclipse.edc.connector.controlplane.catalog.spi.policy.CatalogPolicyContext;
 import org.eclipse.edc.connector.controlplane.asset.spi.index.AssetIndex;
+import org.eclipse.edc.connector.controlplane.catalog.spi.policy.CatalogPolicyContext;
 import org.eclipse.edc.connector.controlplane.contract.spi.policy.ContractNegotiationPolicyContext;
 import org.eclipse.edc.connector.controlplane.contract.spi.policy.TransferProcessPolicyContext;
 import org.eclipse.edc.policy.engine.spi.AtomicConstraintRuleFunction;

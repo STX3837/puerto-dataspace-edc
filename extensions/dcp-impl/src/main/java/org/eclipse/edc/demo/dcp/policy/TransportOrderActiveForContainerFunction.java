@@ -18,8 +18,8 @@ import org.eclipse.edc.policy.engine.spi.DynamicAtomicConstraintRuleFunction;
 import org.eclipse.edc.policy.engine.spi.PolicyContext;
 import org.eclipse.edc.policy.model.Operator;
 import org.eclipse.edc.policy.model.Permission;
-import org.eclipse.edc.spi.query.QuerySpec;
 import org.eclipse.edc.spi.monitor.Monitor;
+import org.eclipse.edc.spi.query.QuerySpec;
 
 import java.io.IOException;
 import java.net.URI;
