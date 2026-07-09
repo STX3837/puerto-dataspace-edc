@@ -606,6 +606,16 @@ streamlit run .\\ui\\app.py""",
         )
 
 
+def render_manual_flow_link():
+    page_path = "pages/1_Manual_Provider_Flow.py"
+    if hasattr(st, "page_link"):
+        st.page_link(page_path, label="Abrir flujo manual por Provider")
+        return
+
+    if st.button("Abrir flujo manual por Provider"):
+        st.switch_page(page_path)
+
+
 def main():
     st.set_page_config(page_title="Puerto Dataspace EDC - Demo Monitor", layout="wide")
 
@@ -617,6 +627,8 @@ def main():
 
     if st.button("Actualizar"):
         st.rerun()
+
+    render_manual_flow_link()
 
     initial_events = load_events()
     auto_refresh = should_auto_refresh(initial_events)
