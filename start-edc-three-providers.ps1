@@ -11,7 +11,6 @@ $TRANSPORT_COMPANY_CREDENTIAL_DEFINITION = Join-Path $RESOURCES "identity\transp
 $TRANSPORT_COMPANY_ATTESTATION = Join-Path $RESOURCES "identity\transport-company-attestation.json"
 $CONSUMER_PARTICIPANT = Join-Path $RESOURCES "identity\consumer-participant-recreate.json"
 $ISSUER_PARTICIPANT = Join-Path $RESOURCES "identity\issuer-participant.json"
-$SMOKE_TEST = Join-Path $PSScriptRoot "smoke-test-three-providers.ps1"
 $GENERATED = Join-Path $RESOURCES "generated"
 New-Item -ItemType Directory -Path $GENERATED -Force | Out-Null
 
@@ -55,7 +54,7 @@ $uiEventsPath = Join-Path $GENERATED "ui-events.jsonl"
 if (Test-Path $uiEventsPath) {
   Remove-Item $uiEventsPath -Force
 }
-Write-UiEvent -Step "script_started" -Status "RUNNING" -Message "Arrancando flujo completo de la demo"
+Write-UiEvent -Step "script_started" -Status "RUNNING" -Message "Arrancando entorno multi-provider"
 
 $providers = @(
   @{
@@ -807,18 +806,8 @@ foreach ($provider in $providers) {
 }
 Write-UiEvent -Step "dataplanes_available" -Status "SUCCESS" -Message "Data Planes disponibles"
 
-Write-Host "7) Ejecutando smoke test de tres providers..."
-Write-UiEvent -Step "smoke_test" -Status "RUNNING" -Message "Ejecutando smoke test multi-provider"
-
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $SMOKE_TEST -Embedded
-
-if ($LASTEXITCODE -ne 0) {
-  throw "El smoke test de tres providers falló con código $LASTEXITCODE"
-}
-
-Write-UiEvent -Step "smoke_test" -Status "SUCCESS" -Message "Smoke test multi-provider validado"
-Write-UiEvent -Step "script_finished" -Status "SUCCESS" -Message "Demo validada correctamente"
-Write-Host "`nENTORNO MULTI-PROVIDER VALIDADO"
+Write-UiEvent -Step "script_finished" -Status "SUCCESS" -Message "Entorno multi-provider arrancado correctamente"
+Write-Host "`nENTORNO MULTI-PROVIDER ARRANCADO"
 }
 catch {
   Write-UiEvent -Step "script_finished" -Status "ERROR" -Message $_.Exception.Message
