@@ -299,6 +299,9 @@ La interfaz ofrece tres acciones:
   `start-edc-and-smoke-three-providers.ps1`.
 - **Arrancar EDC sin smoke**: ejecuta `start-edc-three-providers.ps1`.
 - **Ejecutar solo smoke test**: ejecuta `smoke-test-three-providers.ps1`.
+- **Abrir flujo manual por Provider**: abre una página para ejecutar
+  manualmente catálogo, selección de oferta, negociación, transferencia, EDR y
+  descarga contra un Provider.
 
 Mientras un script está en ejecución, los botones quedan bloqueados para evitar
 ejecuciones solapadas. La UI usa recarga suave cada segundo durante la ejecución
@@ -309,6 +312,10 @@ y muestra:
 - explicación del paso actual y últimos mensajes del flujo;
 - flujo global y estado por Provider;
 - JSON originales y timeline de eventos.
+
+La página manual requiere que la infraestructura y los servicios EDC estén
+levantados previamente. Puede usarse después de **Arrancar EDC sin smoke** o tras
+ejecutar `start-edc-three-providers.ps1` desde consola.
 
 La UI lee eventos desde:
 
