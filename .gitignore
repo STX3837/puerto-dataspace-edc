@@ -67,3 +67,5 @@ consumer-last.log
 resources/generated/*
 !resources/generated/.gitkeep
 *.log
+__pycache__/
+*.py[cod]

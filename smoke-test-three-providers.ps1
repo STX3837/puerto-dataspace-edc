@@ -1,4 +1,5 @@
 ﻿$ErrorActionPreference = "Stop"
+$Embedded = $args -contains "-Embedded"
 
 $CONSUMER_MGMT = "http://localhost:29193/management"
 $CONSUMER_KEY = "consumer-api-key"
@@ -6,6 +7,42 @@ $CONSUMER_KEY = "consumer-api-key"
 $RESOURCES = Join-Path $PSScriptRoot "resources"
 $GENERATED = Join-Path $RESOURCES "generated"
 New-Item -ItemType Directory -Path $GENERATED -Force | Out-Null
+
+function Write-UiEvent {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Step,
+
+    [Parameter(Mandatory = $true)]
+    [ValidateSet("PENDING", "RUNNING", "SUCCESS", "ERROR", "SKIPPED")]
+    [string]$Status,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Message,
+
+    [string]$Provider = "",
+
+    [hashtable]$Data = @{}
+  )
+
+  $generatedDir = Join-Path (Get-Location) "resources\generated"
+  if (-not (Test-Path $generatedDir)) {
+    New-Item -ItemType Directory -Force -Path $generatedDir | Out-Null
+  }
+
+  $eventPath = Join-Path $generatedDir "ui-events.jsonl"
+
+  $event = [ordered]@{
+    timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+    step = $Step
+    status = $Status
+    provider = $Provider
+    message = $Message
+    data = $Data
+  }
+
+  $event | ConvertTo-Json -Depth 20 -Compress | Add-Content -Encoding UTF8 $eventPath
+}
 
 $providers = @(
   @{
@@ -45,6 +82,7 @@ function Invoke-ProviderFlow($p) {
 
   $catalogResponse = Join-Path $GENERATED "catalog-$($p.Name)-response.json"
 
+  Write-UiEvent -Step "catalog" -Status "RUNNING" -Provider $p.Name -Message "Solicitando catálogo a $($p.Name)"
   curl.exe -s -X POST "$CONSUMER_MGMT/v3/catalog/request" `
     -H "X-API-Key: $CONSUMER_KEY" `
     -H "Content-Type: application/json" `
@@ -55,14 +93,17 @@ function Invoke-ProviderFlow($p) {
   $dataset = @($catalog.'dcat:dataset') | Where-Object { $_.'@id' -eq $p.AssetId } | Select-Object -First 1
 
   if (-not $dataset) {
+    Write-UiEvent -Step "catalog" -Status "ERROR" -Provider $p.Name -Message "Asset no encontrado en catálogo de $($p.Name)"
     throw "Asset no encontrado en catálogo de $($p.Name): $($p.AssetId)"
   }
 
   $offerId = $dataset.'odrl:hasPolicy'.'@id'
   if (-not $offerId) {
+    Write-UiEvent -Step "catalog" -Status "ERROR" -Provider $p.Name -Message "Offer ID vacío en $($p.Name)"
     throw "Offer ID vacío en $($p.Name)"
   }
 
+  Write-UiEvent -Step "catalog" -Status "SUCCESS" -Provider $p.Name -Message "Catálogo recibido de $($p.Name)"
   Write-Host "Asset: $($p.AssetId)"
   Write-Host "Offer: $offerId"
 
@@ -87,6 +128,7 @@ function Invoke-ProviderFlow($p) {
     ConvertTo-Json -Depth 30 |
     Set-Content -LiteralPath $negotiationRequest -Encoding utf8
 
+  Write-UiEvent -Step "contract_negotiation" -Status "RUNNING" -Provider $p.Name -Message "Negociando contrato con $($p.Name)"
   $response = Invoke-WebRequest `
     -UseBasicParsing `
     -Method Post `
@@ -109,10 +151,12 @@ function Invoke-ProviderFlow($p) {
 
   if ($neg.state -ne "FINALIZED") {
     $neg | ConvertTo-Json -Depth 20
+    Write-UiEvent -Step "contract_negotiation" -Status "ERROR" -Provider $p.Name -Message "Negociación no finalizada en $($p.Name)"
     throw "Negociación no finalizada en $($p.Name)"
   }
 
   $agreementId = $neg.contractAgreementId
+  Write-UiEvent -Step "contract_negotiation" -Status "SUCCESS" -Provider $p.Name -Message "Contrato finalizado con $($p.Name)" -Data @{ agreementId = $agreementId }
   Write-Host "Agreement: $agreementId"
 
   $transferRequest = Join-Path $GENERATED "transfer-request-$($p.Name).json"
@@ -134,6 +178,7 @@ function Invoke-ProviderFlow($p) {
     ConvertTo-Json -Depth 10 |
     Set-Content -LiteralPath $transferRequest -Encoding utf8
 
+  Write-UiEvent -Step "transfer" -Status "RUNNING" -Provider $p.Name -Message "Iniciando transferencia con $($p.Name)"
   $response = Invoke-WebRequest `
     -UseBasicParsing `
     -Method Post `
@@ -156,18 +201,22 @@ function Invoke-ProviderFlow($p) {
 
   if ($tp.state -eq "TERMINATED") {
     $tp | ConvertTo-Json -Depth 20
+    Write-UiEvent -Step "transfer" -Status "ERROR" -Provider $p.Name -Message "Transfer terminada con error en $($p.Name)" -Data @{ transferId = $transferId }
     throw "Transfer terminada con error en $($p.Name)"
   }
 
   if ($tp.state -notin @("STARTED", "COMPLETED")) {
     $tp | ConvertTo-Json -Depth 20
+    Write-UiEvent -Step "transfer" -Status "ERROR" -Provider $p.Name -Message "Transfer no iniciada en $($p.Name)" -Data @{ transferId = $transferId }
     throw "Transfer no iniciada en $($p.Name)"
   }
 
+  Write-UiEvent -Step "transfer" -Status "SUCCESS" -Provider $p.Name -Message "Transfer STARTED con $($p.Name)" -Data @{ transferId = $transferId }
   Write-Host "Transfer: $transferId"
   Write-Host "State: $($tp.state)"
 
   $edr = $null
+  Write-UiEvent -Step "edr" -Status "RUNNING" -Provider $p.Name -Message "Solicitando EDR de $($p.Name)"
   for ($i = 0; $i -lt 20; $i++) {
     try {
       $edr = Invoke-RestMethod `
@@ -178,6 +227,7 @@ function Invoke-ProviderFlow($p) {
     }
     catch {
       if ($i -eq 19) {
+        Write-UiEvent -Step "edr" -Status "ERROR" -Provider $p.Name -Message "No se pudo obtener EDR de $($p.Name)"
         throw
       }
       Start-Sleep -Seconds 2
@@ -186,27 +236,54 @@ function Invoke-ProviderFlow($p) {
 
   $edrPath = Join-Path $GENERATED "edr-$($p.Name)-response.json"
   $edr | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $edrPath -Encoding utf8
+  Write-UiEvent -Step "edr" -Status "SUCCESS" -Provider $p.Name -Message "EDR obtenido de $($p.Name)"
 
   $endpoint = $edr.endpoint.Replace($p.InternalPublicBase, $p.LocalPublicBase)
   $endpoint = $endpoint.Replace("http://consumer-dataplane:29291", "http://localhost:29291")
 
   $token = $edr.authorization
   if (-not $token) { $token = $edr.authCode }
-  if (-not $token) { throw "No se encontró token EDR en $($p.Name)" }
+  if (-not $token) {
+    Write-UiEvent -Step "edr" -Status "ERROR" -Provider $p.Name -Message "No se encontró token EDR en $($p.Name)"
+    throw "No se encontró token EDR en $($p.Name)"
+  }
 
+  Write-UiEvent -Step "download" -Status "RUNNING" -Provider $p.Name -Message "Descargando dato de $($p.Name)"
   curl.exe -f -s -X GET "$endpoint" `
     -H "Authorization: $token" `
     -o $p.Output
 
   if ($LASTEXITCODE -ne 0) {
+    Write-UiEvent -Step "download" -Status "ERROR" -Provider $p.Name -Message "Falló la descarga en $($p.Name)"
     throw "Falló la descarga en $($p.Name)"
   }
 
+  Write-UiEvent -Step "download" -Status "SUCCESS" -Provider $p.Name -Message "Dato descargado de $($p.Name)"
   Write-Host "Downloaded: $($p.Output)"
 
   return Get-Content -LiteralPath $p.Output -Raw | ConvertFrom-Json
 }
 
+if (-not $Embedded) {
+Write-UiEvent -Step "script_started" -Status "RUNNING" -Message "Ejecutando solo smoke test multi-provider"
+foreach ($step in @(
+    "infra_check",
+    "identityhubs_ready",
+    "issuer_ready",
+    "participants_activation",
+    "membership_credentials",
+    "transport_company_credential",
+    "vault_provisioning",
+    "controlplanes_dataplanes",
+    "assets_policies_contracts",
+    "dataplanes_available"
+  )) {
+  Write-UiEvent -Step $step -Status "SKIPPED" -Message "Paso no ejecutado en modo smoke test"
+}
+Write-UiEvent -Step "smoke_test" -Status "RUNNING" -Message "Ejecutando smoke test multi-provider"
+}
+
+try {
 $customs = Invoke-ProviderFlow $providers[0]
 $health = Invoke-ProviderFlow $providers[1]
 $civilguard = Invoke-ProviderFlow $providers[2]
@@ -231,6 +308,7 @@ $overallStatus = if ($blockingAuthorities.Count -eq 0) {
   "NOT_READY_FOR_PICKUP"
 }
 
+Write-UiEvent -Step "aggregation" -Status "RUNNING" -Message "Agregando resultados de los tres Providers"
 $aggregate = [ordered]@{
   containerId = "MSCU7654321"
   customsStatus = $customs.status
@@ -243,8 +321,27 @@ $aggregate = [ordered]@{
 
 $aggregatePath = Join-Path $GENERATED "aggregated-clearance-status.json"
 $aggregate | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $aggregatePath -Encoding utf8
+Write-UiEvent -Step "aggregation" -Status "SUCCESS" -Message "Resultado agregado generado"
+
+if ($overallStatus -eq "READY_FOR_PICKUP") {
+  Write-UiEvent -Step "result" -Status "SUCCESS" -Message "El contenedor MSCU7654321 está listo para retirada"
+} else {
+  Write-UiEvent -Step "result" -Status "ERROR" -Message "El contenedor MSCU7654321 no está listo para retirada"
+}
 
 Write-Host "`n=== RESULTADO AGREGADO ==="
 Get-Content -LiteralPath $aggregatePath
 
+if (-not $Embedded) {
+  Write-UiEvent -Step "smoke_test" -Status "SUCCESS" -Message "Smoke test multi-provider validado"
+  Write-UiEvent -Step "script_finished" -Status "SUCCESS" -Message "Smoke test validado correctamente"
+}
 Write-Host "`nOK: flujo multi-provider validado"
+}
+catch {
+  if (-not $Embedded) {
+    Write-UiEvent -Step "smoke_test" -Status "ERROR" -Message $_.Exception.Message
+    Write-UiEvent -Step "script_finished" -Status "ERROR" -Message $_.Exception.Message
+  }
+  throw
+}

@@ -211,6 +211,12 @@ Después ejecuta el flujo completo de provisionado y smoke test:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\start-edc-and-smoke-three-providers.ps1
 ```
 
+Si quieres dejar el entorno arrancado y provisionado sin ejecutar el smoke test:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\start-edc-three-providers.ps1
+```
+
 Este es el comando principal de validación del proyecto. El script
 [`start-edc-and-smoke-three-providers.ps1`](start-edc-and-smoke-three-providers.ps1)
 realiza automáticamente:
@@ -266,6 +272,55 @@ Los artefactos de ejecución se escriben en `resources/generated/`:
 - `edr-*-response.json`: Endpoint Data References.
 - `downloaded-*-clearance.json`: datos descargados de cada Provider.
 - `aggregated-clearance-status.json`: resultado final consolidado.
+
+## Interfaz visual
+
+El proyecto incluye un dashboard local en Streamlit para seguir visualmente el
+flujo del script principal, el arranque sin smoke test y la validación
+multi-provider.
+
+Instalación:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r .\ui\requirements.txt
+```
+
+Ejecución:
+
+```powershell
+streamlit run .\ui\app.py
+```
+
+La interfaz ofrece tres acciones:
+
+- **Ejecutar demo completa**: ejecuta
+  `start-edc-and-smoke-three-providers.ps1`.
+- **Arrancar EDC sin smoke**: ejecuta `start-edc-three-providers.ps1`.
+- **Ejecutar solo smoke test**: ejecuta `smoke-test-three-providers.ps1`.
+
+Mientras un script está en ejecución, los botones quedan bloqueados para evitar
+ejecuciones solapadas. La UI usa recarga suave cada segundo durante la ejecución
+y muestra:
+
+- estado global, progreso, último evento y timestamp;
+- artefactos visuales y resultado agregado;
+- explicación del paso actual y últimos mensajes del flujo;
+- flujo global y estado por Provider;
+- JSON originales y timeline de eventos.
+
+La UI lee eventos desde:
+
+```text
+resources/generated/ui-events.jsonl
+```
+
+y muestra los artefactos generados en:
+
+```text
+resources/generated/
+```
 
 ## Tests unitarios
 
