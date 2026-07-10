@@ -1,4 +1,6 @@
 from copy import deepcopy
+from copy import deepcopy
+import base64
 from datetime import datetime, timezone
 from pathlib import Path
 import json
@@ -21,6 +23,8 @@ PROVIDERS = {
         "label": "Customs",
         "did": "did:web:provider-identityhub%3A8183:provider",
         "address": "http://provider-controlplane:19292/protocol",
+        "management_url": "http://localhost:19193/management",
+        "api_key": "provider-api-key",
         "asset_id": "asset-clearance-mscu7654321",
         "catalog_request": RESOURCES / "catalog" / "catalog-request.json",
         "internal_public_base": "http://provider-dataplane:19294",
@@ -32,6 +36,8 @@ PROVIDERS = {
         "label": "Health",
         "did": "did:web:health-identityhub%3A8183:health",
         "address": "http://health-controlplane:19292/protocol",
+        "management_url": "http://localhost:21193/management",
+        "api_key": "provider-api-key",
         "asset_id": "asset-health-clearance-mscu7654321",
         "catalog_request": RESOURCES / "catalog" / "catalog-request-health.json",
         "internal_public_base": "http://health-dataplane:19294",
@@ -43,6 +49,8 @@ PROVIDERS = {
         "label": "CivilGuard",
         "did": "did:web:civilguard-identityhub%3A8183:civilguard",
         "address": "http://civilguard-controlplane:19292/protocol",
+        "management_url": "http://localhost:22193/management",
+        "api_key": "provider-api-key",
         "asset_id": "asset-civilguard-clearance-mscu7654321",
         "catalog_request": RESOURCES / "catalog" / "catalog-request-civilguard.json",
         "internal_public_base": "http://civilguard-dataplane:19294",
@@ -59,6 +67,7 @@ MANUAL_KEYS = {
     "manual_selected_offer",
     "manual_negotiation_id",
     "manual_agreement_id",
+    "manual_agreement_asset_id",
     "manual_negotiation_state",
     "manual_transfer_id",
     "manual_transfer_state",
@@ -137,10 +146,23 @@ def consumer_headers():
     }
 
 
+def provider_headers(provider: dict):
+    return {
+        "X-API-Key": provider["api_key"],
+        "Content-Type": "application/json",
+    }
+
+
 def request_catalog(provider: dict) -> dict:
     payload = load_json(provider["catalog_request"])
     if payload is None:
         raise RuntimeError(f"No se pudo leer {provider['catalog_request']}")
+    payload = deepcopy(payload)
+    payload["querySpec"] = {
+        "offset": 0,
+        "limit": 100,
+        "filterExpression": [],
+    }
 
     return request_json(
         "POST",
@@ -148,6 +170,122 @@ def request_catalog(provider: dict) -> dict:
         headers=consumer_headers(),
         json_body=payload,
     )
+
+
+def query_provider_collection(provider: dict, resource: str):
+    payload = {
+        "@context": {
+            "@vocab": "https://w3id.org/edc/v0.0.1/ns/",
+        },
+        "@type": "QuerySpec",
+        "offset": 0,
+        "limit": 100,
+    }
+    return request_json(
+        "POST",
+        f"{provider['management_url']}/v3/{resource}/request",
+        headers=provider_headers(provider),
+        json_body=payload,
+    )
+
+
+def response_items(response):
+    if isinstance(response, list):
+        return response
+    if isinstance(response, dict):
+        for key in ("value", "content", "items", "results", "data"):
+            value = response.get(key)
+            if isinstance(value, list):
+                return value
+        return [response]
+    return []
+
+
+def resource_id(resource: dict):
+    return resource.get("@id") or resource.get("id") or resource.get("edc:id")
+
+
+def contract_asset_selector(contract_definition: dict):
+    selectors = as_list(
+        contract_definition.get("assetsSelector")
+        or contract_definition.get("edc:assetsSelector")
+    )
+    for selector in selectors:
+        if not isinstance(selector, dict):
+            continue
+        left = value_id(selector.get("operandLeft") or selector.get("edc:operandLeft"))
+        right = selector.get("operandRight") or selector.get("edc:operandRight")
+        if left == "https://w3id.org/edc/v0.0.1/ns/id":
+            return value_id(right)
+    return ""
+
+
+def build_empty_catalog_diagnostics(provider: dict) -> list[str]:
+    try:
+        assets = response_items(query_provider_collection(provider, "assets"))
+        policies = response_items(query_provider_collection(provider, "policydefinitions"))
+        contracts = response_items(query_provider_collection(provider, "contractdefinitions"))
+    except Exception as exc:
+        return [f"No se pudo consultar la Management API del Provider para diagnosticarlo: {exc}"]
+
+    asset_ids = {resource_id(asset) for asset in assets if isinstance(asset, dict)}
+    policy_ids = {resource_id(policy) for policy in policies if isinstance(policy, dict)}
+    messages = []
+
+    if not assets:
+        messages.append("El Provider no tiene Assets registrados.")
+    if not policies:
+        messages.append("El Provider no tiene Policies registradas.")
+    if not contracts:
+        messages.append("El Provider no tiene Contract Definitions registradas.")
+
+    for contract in contracts:
+        if not isinstance(contract, dict):
+            continue
+        contract_id = resource_id(contract) or "sin id"
+        selector_asset_id = contract_asset_selector(contract)
+        access_policy_id = contract.get("accessPolicyId") or contract.get("edc:accessPolicyId")
+        contract_policy_id = contract.get("contractPolicyId") or contract.get("edc:contractPolicyId")
+
+        if selector_asset_id and selector_asset_id not in asset_ids:
+            messages.append(
+                f"La Contract Definition `{contract_id}` apunta al Asset `{selector_asset_id}`, "
+                "pero ese Asset no existe en el Provider."
+            )
+        if access_policy_id and access_policy_id not in policy_ids:
+            messages.append(
+                f"La Contract Definition `{contract_id}` usa la Access Policy `{access_policy_id}`, "
+                "pero esa Policy no existe."
+            )
+        if contract_policy_id and contract_policy_id not in policy_ids:
+            messages.append(
+                f"La Contract Definition `{contract_id}` usa la Contract Policy `{contract_policy_id}`, "
+                "pero esa Policy no existe."
+            )
+
+    if not messages:
+        messages.append(
+            "Hay Assets, Policies y Contract Definitions, pero ninguna se publica en el catalogo. "
+            "Revisa que la Access Policy permita al Consumer ver la oferta."
+        )
+
+    return messages
+
+
+def reset_after_catalog_request():
+    for key in (
+        "manual_selected_offer",
+        "manual_negotiation_id",
+        "manual_agreement_id",
+        "manual_agreement_asset_id",
+        "manual_negotiation_state",
+        "manual_transfer_id",
+        "manual_transfer_state",
+        "manual_edr_response",
+        "manual_download_response",
+        "manual_error",
+    ):
+        st.session_state.pop(key, None)
 
 
 def as_list(value):
@@ -178,11 +316,13 @@ def extract_offers(catalog: dict) -> list[dict]:
         for policy in as_list(policies):
             if not isinstance(policy, dict):
                 continue
+            offer_id = policy.get("@id") or policy.get("id")
             offers.append(
                 {
-                    "offer_id": policy.get("@id") or policy.get("id"),
+                    "offer_id": offer_id,
                     "asset_id": asset_id,
-                    "policy_id": policy.get("@id") or policy.get("id"),
+                    "contract_definition_id": offer_contract_definition_id(offer_id),
+                    "policy_id": "",
                     "dataset": dataset,
                     "policy": policy,
                 }
@@ -191,10 +331,118 @@ def extract_offers(catalog: dict) -> list[dict]:
     return offers
 
 
+def enrich_offer_policy_ids(provider: dict, offers: list[dict]) -> list[dict]:
+    try:
+        contracts = response_items(query_provider_collection(provider, "contractdefinitions"))
+    except Exception:
+        return offers
+
+    by_asset = {}
+    by_contract_definition = {}
+    for contract in contracts:
+        if not isinstance(contract, dict):
+            continue
+        contract_id = resource_id(contract)
+        asset_id = contract_asset_selector(contract)
+        contract_policy_id = contract.get("contractPolicyId") or contract.get("edc:contractPolicyId")
+        access_policy_id = contract.get("accessPolicyId") or contract.get("edc:accessPolicyId")
+        if not contract_policy_id:
+            continue
+        metadata = {
+            "contract_definition_id": contract_id,
+            "access_policy_id": access_policy_id,
+            "policy_id": contract_policy_id,
+        }
+        if contract_id:
+            by_contract_definition[contract_id] = metadata
+        if asset_id and asset_id not in by_asset:
+            by_asset[asset_id] = metadata
+
+    enriched = []
+    for offer in offers:
+        metadata = (
+            by_contract_definition.get(offer.get("contract_definition_id"))
+            or by_asset.get(offer.get("asset_id"))
+            or {}
+        )
+        enriched_offer = deepcopy(offer)
+        enriched_offer.update({key: value for key, value in metadata.items() if value})
+        enriched.append(enriched_offer)
+    return enriched
+
+
+def provider_contract_definition_rows(provider: dict, offers: list[dict]) -> list[dict]:
+    offered_assets = {offer.get("asset_id") for offer in offers if offer.get("asset_id")}
+    offered_policy_ids = {offer.get("policy_id") for offer in offers if offer.get("policy_id")}
+    try:
+        assets = response_items(query_provider_collection(provider, "assets"))
+        policies = response_items(query_provider_collection(provider, "policydefinitions"))
+        contracts = response_items(query_provider_collection(provider, "contractdefinitions"))
+    except Exception as exc:
+        return [
+            {
+                "contract definition id": "no disponible",
+                "asset id": "",
+                "access policy id": "",
+                "contract policy id": "",
+                "en catalogo": "No se pudo consultar",
+                "detalle": str(exc),
+            }
+        ]
+
+    asset_ids = {resource_id(asset) for asset in assets if isinstance(asset, dict)}
+    policy_ids = {resource_id(policy) for policy in policies if isinstance(policy, dict)}
+    rows = []
+    for contract in contracts:
+        if not isinstance(contract, dict):
+            continue
+        selector_asset_id = contract_asset_selector(contract)
+        access_policy_id = contract.get("accessPolicyId") or contract.get("edc:accessPolicyId") or ""
+        contract_policy_id = contract.get("contractPolicyId") or contract.get("edc:contractPolicyId") or ""
+        is_published = selector_asset_id in offered_assets or contract_policy_id in offered_policy_ids
+        detail = "Oferta negociable"
+        if not is_published:
+            if selector_asset_id not in asset_ids:
+                detail = "El Asset selector no existe en el Provider"
+            elif access_policy_id not in policy_ids:
+                detail = "La Access Policy no existe"
+            elif contract_policy_id not in policy_ids:
+                detail = "La Contract Policy no existe"
+            else:
+                detail = "Registrada, pero la Access Policy no la publica para este Consumer"
+        rows.append(
+            {
+                "contract definition id": resource_id(contract) or "sin id",
+                "asset id": selector_asset_id or "sin selector",
+                "access policy id": access_policy_id,
+                "contract policy id": contract_policy_id,
+                "en catalogo": "Si" if is_published else "No",
+                "detalle": detail,
+            }
+        )
+    return rows
+
+
 def value_id(value):
     if isinstance(value, dict):
         return value.get("@id") or value.get("id") or json.dumps(value, ensure_ascii=False)
     return value
+
+
+def decode_offer_id_part(offer_id: str, index: int) -> str:
+    parts = str(offer_id or "").split(":")
+    if index >= len(parts):
+        return ""
+    encoded = parts[index]
+    padding = "=" * (-len(encoded) % 4)
+    try:
+        return base64.urlsafe_b64decode(f"{encoded}{padding}").decode("utf-8")
+    except (ValueError, UnicodeDecodeError):
+        return ""
+
+
+def offer_contract_definition_id(offer_id: str) -> str:
+    return decode_offer_id_part(offer_id, 0)
 
 
 def summarize_constraints(constraints) -> str:
@@ -219,6 +467,7 @@ def summarize_offer(offer: dict) -> dict:
 
     return {
         "asset id": offer.get("asset_id") or "sin asset",
+        "contract definition id": offer.get("contract_definition_id") or "no disponible",
         "offer id": offer.get("offer_id") or "sin id",
         "policy id": offer.get("policy_id") or "sin policy",
         "permission/action": action or "no disponible",
@@ -267,7 +516,7 @@ def poll_contract_negotiation(negotiation_id: str, timeout_seconds: int = 60) ->
     return last
 
 
-def start_transfer(provider: dict, agreement_id: str) -> dict:
+def start_transfer(provider: dict, agreement_id: str, asset_id: str) -> dict:
     payload = {
         "@context": {
             "@vocab": "https://w3id.org/edc/v0.0.1/ns/",
@@ -276,7 +525,7 @@ def start_transfer(provider: dict, agreement_id: str) -> dict:
         "counterPartyId": provider["did"],
         "counterPartyAddress": provider["address"],
         "protocol": "dataspace-protocol-http",
-        "assetId": provider["asset_id"],
+        "assetId": asset_id,
         "contractId": agreement_id,
         "transferType": "HttpData-PULL",
     }
@@ -420,7 +669,27 @@ def status_badge(status: str) -> str:
     return "RUNNING"
 
 
-def render_result_card(title: str, status: str, fields: dict):
+def short_value(value, max_length: int = 18) -> str:
+    text = str(value or "Pendiente")
+    if len(text) <= max_length:
+        return text
+    return f"{text[:8]}...{text[-6:]}"
+
+
+def render_copyable_value(label: str, value):
+    text = str(value or "")
+    with st.expander(label):
+        st.code(text or "Pendiente", language="text")
+
+
+def render_full_value(label: str, value):
+    st.caption(label)
+    st.code(str(value or "Pendiente"), language="text")
+
+
+def render_result_card(title: str, status: str, fields: dict, copyable_fields=None, full_fields=None):
+    copyable_fields = set(copyable_fields or [])
+    full_fields = set(full_fields or [])
     badge = status_badge(status)
     if badge == "SUCCESS":
         st.success(f"{title}: {status}")
@@ -432,7 +701,15 @@ def render_result_card(title: str, status: str, fields: dict):
     with st.container(border=True):
         columns = st.columns(min(max(len(fields), 1), 4))
         for column, (label, value) in zip(columns, fields.items()):
-            column.metric(label, str(value or "Pendiente"))
+            if label in copyable_fields:
+                with column:
+                    st.metric(label, short_value(value))
+                    render_copyable_value("Copiar valor completo", value)
+            elif label in full_fields:
+                with column:
+                    render_full_value(label, value)
+            else:
+                column.metric(label, str(value or "Pendiente"))
 
 
 def render_download_card(download_response: dict):
@@ -444,7 +721,7 @@ def render_download_card(download_response: dict):
         "authority": body.get("authority") if isinstance(body, dict) else "N/A",
         "status": status,
     }
-    render_result_card("Dato descargado", status or "SUCCESS", fields)
+    render_result_card("Dato descargado", status or "SUCCESS", fields, full_fields={"authority"})
     st.caption(f"Endpoint usado: `{download_response.get('endpoint')}`")
 
 
@@ -469,23 +746,22 @@ def main():
     provider = PROVIDERS[provider_key]
 
     st.subheader("Provider seleccionado")
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
     col1.metric("Nombre", provider["label"])
-    col2.metric("Asset esperado", provider["asset_id"])
-    col3.caption(f"DSP endpoint: `{provider['address']}`")
-    col4.caption(f"Consumer Management API: `{CONSUMER_MGMT}`")
+    col2.caption(f"DSP endpoint: `{provider['address']}`")
+    col3.caption(f"Consumer Management API: `{CONSUMER_MGMT}`")
     st.caption(f"Estado actual: {st.session_state.get('manual_transfer_state') or st.session_state.get('manual_negotiation_state') or 'Pendiente'}")
 
     st.subheader("1. Catálogo")
     if st.button("Pedir catálogo"):
         write_ui_event("manual_catalog", "RUNNING", provider_key, "Solicitando catálogo manual")
+        reset_after_catalog_request()
         try:
             with st.spinner("Solicitando catálogo..."):
                 catalog = request_catalog(provider)
             st.session_state.manual_catalog_response = catalog
-            offers = extract_offers(catalog)
+            offers = enrich_offer_policy_ids(provider, extract_offers(catalog))
             st.session_state.manual_offers = offers
-            st.session_state.pop("manual_selected_offer", None)
             save_json(GENERATED_DIR / f"manual-catalog-{provider_key}.json", catalog)
             write_ui_event(
                 "manual_catalog",
@@ -506,6 +782,7 @@ def main():
     st.subheader("2. Ofertas")
     offers = st.session_state.get("manual_offers", [])
     if offers:
+        st.caption(f"Ofertas negociables recibidas en el catálogo: {len(offers)}")
         summaries = [summarize_offer(offer) for offer in offers]
         st.dataframe(summaries, use_container_width=True, hide_index=True)
         if not isinstance(st.session_state.get("manual_selected_offer"), int):
@@ -515,15 +792,29 @@ def main():
             "Oferta",
             offer_indexes,
             key="manual_selected_offer",
-            format_func=lambda index: offers[index].get("asset_id") or f"asset-{index}",
+            format_func=lambda index: (
+                f"{offers[index].get('asset_id') or f'asset-{index}'}"
+                f" - {offers[index].get('contract_definition_id') or 'sin contract definition'}"
+            ),
         )
         selected = offers[selected_offer_index]
         st.caption(f"Asset seleccionado: `{selected.get('asset_id')}`")
         st.caption(f"Offer id: `{selected.get('offer_id')}`")
     elif catalog:
         st.error("El catálogo no contiene ofertas válidas para negociar.")
+        with st.expander("Diagnóstico del Provider"):
+            for message in build_empty_catalog_diagnostics(provider):
+                st.warning(message)
     else:
         st.info("Pide el catálogo para ver las ofertas disponibles.")
+
+    if catalog:
+        with st.expander("Contract Definitions registradas en el Provider"):
+            rows = provider_contract_definition_rows(provider, offers)
+            if rows:
+                st.dataframe(rows, use_container_width=True, hide_index=True)
+            else:
+                st.info("No hay Contract Definitions registradas en este Provider.")
 
     selected_offer = selected_offer_from_state()
 
@@ -542,6 +833,7 @@ def main():
             state = final.get("state")
             st.session_state.manual_negotiation_id = negotiation_id
             st.session_state.manual_agreement_id = agreement_id
+            st.session_state.manual_agreement_asset_id = selected_offer.get("asset_id") or provider["asset_id"]
             st.session_state.manual_negotiation_state = state
             save_json(
                 GENERATED_DIR / f"manual-negotiation-{provider_key}.json",
@@ -570,7 +862,10 @@ def main():
                 "state": st.session_state.get("manual_negotiation_state"),
                 "negotiation id": st.session_state.get("manual_negotiation_id"),
                 "agreement id": st.session_state.get("manual_agreement_id"),
+                "asset id": st.session_state.get("manual_agreement_asset_id"),
             },
+            copyable_fields={"negotiation id", "agreement id"},
+            full_fields={"asset id"},
         )
 
     st.subheader("4. Transferencia")
@@ -579,7 +874,8 @@ def main():
         write_ui_event("manual_transfer", "RUNNING", provider_key, "Iniciando transferencia manual")
         try:
             with st.spinner("Iniciando transferencia..."):
-                created = start_transfer(provider, agreement_id)
+                asset_id = st.session_state.get("manual_agreement_asset_id") or provider["asset_id"]
+                created = start_transfer(provider, agreement_id, asset_id)
                 transfer_id = created.get("@id") or created.get("id")
                 if not transfer_id:
                     raise RuntimeError("La respuesta no contiene transfer process id")
@@ -615,6 +911,7 @@ def main():
                 "state": st.session_state.get("manual_transfer_state"),
                 "transfer process id": st.session_state.get("manual_transfer_id"),
             },
+            copyable_fields={"transfer process id"},
         )
 
     st.subheader("5. EDR y descarga")

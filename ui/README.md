@@ -24,6 +24,9 @@ streamlit run .\ui\app.py
 - **Ejecutar solo smoke test**: ejecuta `smoke-test-three-providers.ps1`.
 - **Abrir flujo manual por Provider**: abre una página para ejecutar paso a paso
   catálogo, selección de oferta, negociación, transferencia, EDR y descarga.
+- **Abrir provisioning de Provider**: abre una página para crear, consultar y
+  actualizar o borrar Assets, Policies y Contract Definitions en la Management
+  API de cada Provider.
 
 La UI bloquea los botones mientras haya una ejecución activa para evitar scripts
 solapados. Al lanzar una ejecución desde la UI se reinician los eventos y
@@ -48,11 +51,21 @@ La página **Flujo manual por Provider** permite:
 
 1. Seleccionar `customs`, `health` o `civilguard`.
 2. Pedir catálogo al Consumer Management API.
-3. Ver ofertas disponibles y seleccionar una.
+3. Ver ofertas disponibles, con `asset id`, `contract definition id`, `offer id`
+   y `policy id` real.
 4. Negociar contrato hasta `FINALIZED`.
 5. Iniciar transferencia hasta `STARTED`.
 6. Obtener EDR y descargar el dato.
 7. Ver el JSON descargado y guardar artefactos `manual-*.json`.
+
+El `offer id` es el identificador DSP de la oferta. El `policy id` mostrado es
+la Contract Policy real asociada en el Provider. Cuando un mismo Asset aparece
+varias veces, la tabla y el desplegable lo diferencian por `contract definition
+id`; eso indica que varias Contract Definitions publican el mismo Asset.
+
+Las tarjetas de resultado acortan identificadores largos pero ofrecen un
+desplegable para copiarlos completos. El `asset id` de negociación y el campo
+`authority` descargado se muestran completos.
 
 Antes de usarla, la infraestructura y los servicios EDC deben estar levantados.
 Puedes prepararlo con **Arrancar EDC sin smoke** o desde consola:
@@ -60,6 +73,34 @@ Puedes prepararlo con **Arrancar EDC sin smoke** o desde consola:
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\start-edc-three-providers.ps1
 ```
+
+### Provisioning de Provider
+
+La página **Provisioning de Provider** permite:
+
+1. Seleccionar `customs`, `health` o `civilguard`.
+2. Construir y revisar el payload de un Asset.
+3. Crear, consultar, actualizar o borrar el Asset con la Management API.
+4. Construir y revisar una Policy `allow-use`, `transport-company-valid-order`
+   o `custom-json`.
+5. Crear, consultar, actualizar o borrar la Policy.
+6. Construir y revisar una Contract Definition usando desplegables con los
+   Assets y Policies disponibles del Provider.
+7. Crear, consultar, actualizar o borrar la Contract Definition.
+8. Validar el endpoint backend, normalizando
+   `http://regulatory-clearance-api:8081` a `http://localhost:8081` para
+   pruebas desde el host.
+9. Elegir que Asset, Policy, backend endpoint o Contract Definition validar
+   desde la sección de resumen/validación.
+
+Las actualizaciones de Asset y Contract Definition usan `PUT` para no borrar
+recursos que puedan estar referenciados por acuerdos o negociaciones. Las
+Contract Definitions asociadas a un Asset se conservan. Para Policies, EDC no
+expone `PUT`; la UI usa `DELETE+POST` y recrea después las Contract Definitions
+asociadas con los mismos datos.
+
+La pantalla guarda payloads y respuestas en `resources/generated` con prefijo
+`provider-provisioning-*` y escribe eventos `provider_*` en `ui-events.jsonl`.
 
 ## Artefactos leídos
 
@@ -69,6 +110,7 @@ resources/generated/aggregated-clearance-status.json
 resources/generated/downloaded-*-clearance.json
 resources/generated/edr-*-response.json
 resources/generated/manual-*.json
+resources/generated/provider-provisioning-*.json
 ```
 
 Si todavía no existen eventos o artefactos, el dashboard muestra `Pendiente` y

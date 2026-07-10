@@ -12,6 +12,8 @@ package org.eclipse.edc.demo.dcp.policy;
 
 import org.eclipse.edc.connector.controlplane.asset.spi.domain.Asset;
 import org.eclipse.edc.connector.controlplane.asset.spi.index.AssetIndex;
+import org.eclipse.edc.connector.controlplane.catalog.spi.policy.CatalogPolicyContext;
+import org.eclipse.edc.connector.controlplane.contract.spi.policy.ContractNegotiationPolicyContext;
 import org.eclipse.edc.connector.controlplane.contract.spi.policy.TransferProcessPolicyContext;
 import org.eclipse.edc.policy.engine.spi.AtomicConstraintRuleFunction;
 import org.eclipse.edc.policy.engine.spi.DynamicAtomicConstraintRuleFunction;
@@ -70,6 +72,11 @@ public class TransportOrderActiveForContainerFunction<C extends PolicyContext> i
             return false;
         }
 
+        if (isDeferredUntilTransferContext(rightOperand, policyContext)) {
+            monitor.info("TransportOrder.activeForContainer deferred for scope '%s' because no concrete asset is available yet.".formatted(policyContext.scope()));
+            return true;
+        }
+
         var containerId = resolveContainerId(rightOperand, policyContext);
         if (containerId == null || containerId.isBlank()) {
             policyContext.reportProblem("Could not resolve containerId from asset properties.");
@@ -78,6 +85,12 @@ public class TransportOrderActiveForContainerFunction<C extends PolicyContext> i
         }
 
         return validateTransportOrder(containerId, policyContext);
+    }
+
+    private boolean isDeferredUntilTransferContext(Object rightOperand, C policyContext) {
+        return Objects.equals(CONTAINER_ID_PLACEHOLDER, rightOperand) &&
+                (Objects.equals(CatalogPolicyContext.CATALOG_SCOPE, policyContext.scope()) ||
+                        Objects.equals(ContractNegotiationPolicyContext.NEGOTIATION_SCOPE, policyContext.scope()));
     }
 
     @Override
