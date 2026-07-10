@@ -616,6 +616,16 @@ def render_manual_flow_link():
         st.switch_page(page_path)
 
 
+def render_provider_provisioning_link():
+    page_path = "pages/2_Provider_Provisioning.py"
+    if hasattr(st, "page_link"):
+        st.page_link(page_path, label="Abrir provisioning de Provider")
+        return
+
+    if st.button("Abrir provisioning de Provider"):
+        st.switch_page(page_path)
+
+
 def main():
     st.set_page_config(page_title="Puerto Dataspace EDC - Demo Monitor", layout="wide")
 
@@ -629,6 +639,7 @@ def main():
         st.rerun()
 
     render_manual_flow_link()
+    render_provider_provisioning_link()
 
     initial_events = load_events()
     auto_refresh = should_auto_refresh(initial_events)

@@ -293,7 +293,7 @@ Ejecución:
 streamlit run .\ui\app.py
 ```
 
-La interfaz ofrece tres acciones:
+La interfaz ofrece estas acciones:
 
 - **Ejecutar demo completa**: ejecuta
   `start-edc-and-smoke-three-providers.ps1`.
@@ -302,6 +302,9 @@ La interfaz ofrece tres acciones:
 - **Abrir flujo manual por Provider**: abre una página para ejecutar
   manualmente catálogo, selección de oferta, negociación, transferencia, EDR y
   descarga contra un Provider.
+- **Abrir provisioning de Provider**: abre una pagina para crear, consultar,
+  actualizar o borrar Assets, Policies y Contract Definitions desde la
+  Management API de cada Provider.
 
 Mientras un script está en ejecución, los botones quedan bloqueados para evitar
 ejecuciones solapadas. La UI usa recarga suave cada segundo durante la ejecución
@@ -313,9 +316,52 @@ y muestra:
 - flujo global y estado por Provider;
 - JSON originales y timeline de eventos.
 
-La página manual requiere que la infraestructura y los servicios EDC estén
-levantados previamente. Puede usarse después de **Arrancar EDC sin smoke** o tras
-ejecutar `start-edc-three-providers.ps1` desde consola.
+La pagina manual y la pantalla de provisioning requieren que la infraestructura
+y los servicios EDC estén levantados previamente. Pueden usarse después de
+**Arrancar EDC sin smoke** o tras ejecutar `start-edc-three-providers.ps1` desde
+consola.
+
+### Flujo manual por Provider
+
+La página **Flujo manual por Provider** permite ejecutar el flujo paso a paso
+contra `customs`, `health` o `civilguard`:
+
+1. Pedir el catálogo desde el Consumer Management API.
+2. Revisar las ofertas recibidas en una tabla visual.
+3. Seleccionar una oferta concreta.
+4. Negociar el contrato.
+5. Iniciar la transferencia.
+6. Obtener el EDR y descargar el dato.
+
+La tabla de ofertas muestra el `asset id`, el `contract definition id`, el
+`offer id` DSP y el `policy id` real de la Contract Policy del Provider. Si un
+Asset aparece más de una vez, significa que hay varias Contract Definitions que
+publican ese mismo Asset; el desplegable las diferencia como
+`asset id - contract definition id`.
+
+La tarjeta de negociación muestra el `asset id` completo y permite copiar los
+identificadores largos de negociación y acuerdo. La tarjeta de transferencia
+permite copiar el `transfer process id`, y la descarga muestra completo el campo
+`authority`.
+
+### Provisioning de Provider
+
+La página **Provisioning de Provider** permite gestionar recursos de cada
+Provider desde su Management API:
+
+- Crear, consultar, actualizar y borrar Assets.
+- Crear, consultar, actualizar y borrar Policies.
+- Crear, consultar, actualizar y borrar Contract Definitions.
+- Construir Contract Definitions usando desplegables con los Assets y Policies
+  disponibles del Provider.
+- Validar Assets, Policies, backend endpoints y Contract Definitions
+  seleccionados desde la sección de resumen/validación.
+
+Las actualizaciones de Asset y Contract Definition usan `PUT`, por lo que no
+intentan borrar recursos ya referenciados por acuerdos o negociaciones. Las
+Contract Definitions asociadas al Asset se conservan. En Policies, el endpoint
+de EDC no expone `PUT`; por eso la UI usa `DELETE+POST` y recrea despues las
+Contract Definitions asociadas con los mismos datos.
 
 La UI lee eventos desde:
 
@@ -328,6 +374,9 @@ y muestra los artefactos generados en:
 ```text
 resources/generated/
 ```
+
+La pantalla de provisioning guarda también payloads y respuestas con prefijo
+`provider-provisioning-*` en ese mismo directorio.
 
 ## Tests unitarios
 
