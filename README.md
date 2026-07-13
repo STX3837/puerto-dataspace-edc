@@ -165,6 +165,12 @@ MSCU7654321
 La validación de orden activa se realiza contra el Mock API de regulatory
 clearance, que expone datos de demostración para el transportista del Consumer.
 
+Si se consulta un contenedor que no esta precargado pero cuyo identificador es
+válido (`4 letras + 7 digitos`, por ejemplo `TESU1111111`), la Mock API devuelve
+respuestas sintéticas `CLEARED` para Customs, Health y CivilGuard, y valida una
+orden de transporte activa de demo. Los identificadores con formato invalido se
+rechazan con HTTP `400`.
+
 ## Requisitos
 
 - Windows con Docker Desktop en ejecución.
@@ -284,13 +290,13 @@ Instalación:
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r .\ui\requirements.txt
+python -m pip install -r .\ui\requirements.txt
 ```
 
 Ejecución:
 
 ```powershell
-streamlit run .\ui\app.py
+python -m streamlit run .\ui\app.py
 ```
 
 La interfaz ofrece estas acciones:
@@ -352,10 +358,18 @@ Provider desde su Management API:
 - Crear, consultar, actualizar y borrar Assets.
 - Crear, consultar, actualizar y borrar Policies.
 - Crear, consultar, actualizar y borrar Contract Definitions.
+- Bloquear la creación o actualización de Assets cuando el `containerId` del
+  Asset no coincide con el incluido en el backend endpoint.
 - Construir Contract Definitions usando desplegables con los Assets y Policies
   disponibles del Provider.
 - Validar Assets, Policies, backend endpoints y Contract Definitions
   seleccionados desde la sección de resumen/validación.
+
+El `Container ID` solo es necesario en Policies que restringen por
+`TransportOrder.activeForContainer`. Al crear o actualizar una Contract
+Definition, la UI valida que el `containerId` del Asset y el de la Contract
+Policy seleccionada coincidan. Si la Policy usa `${containerId}`, se considera
+compatible porque EDC lo resuelve desde el Asset.
 
 Las actualizaciones de Asset y Contract Definition usan `PUT`, por lo que no
 intentan borrar recursos ya referenciados por acuerdos o negociaciones. Las

@@ -8,13 +8,13 @@ Dashboard local para seguir visualmente el flujo multi-provider de
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r .\ui\requirements.txt
+python -m pip install -r .\ui\requirements.txt
 ```
 
 ## Ejecución
 
 ```powershell
-streamlit run .\ui\app.py
+python -m streamlit run .\ui\app.py
 ```
 
 ## Botones disponibles
@@ -98,6 +98,20 @@ recursos que puedan estar referenciados por acuerdos o negociaciones. Las
 Contract Definitions asociadas a un Asset se conservan. Para Policies, EDC no
 expone `PUT`; la UI usa `DELETE+POST` y recrea después las Contract Definitions
 asociadas con los mismos datos.
+
+La pantalla valida los `Container ID` con el formato `4 letras + 7 digitos`
+antes de crear o actualizar Assets y Policies, y también revisa el identificador
+incluido en el `Backend endpoint / baseUrl` cuando apunta a `/containers/.../`.
+La Mock API devuelve `CLEARED` para contenedores válidos no precargados.
+
+Para crear o actualizar un Asset, el `Container ID` del Asset y el incluido en
+el backend endpoint deben coincidir.
+
+El `Container ID` solo es necesario en Policies que restringen por
+`TransportOrder.activeForContainer`. Al crear o actualizar una Contract
+Definition, la UI valida que el `containerId` del Asset y el de la Contract
+Policy seleccionada coincidan. Si la Policy usa `${containerId}`, se considera
+compatible porque EDC lo resuelve desde el Asset.
 
 La pantalla guarda payloads y respuestas en `resources/generated` con prefijo
 `provider-provisioning-*` y escribe eventos `provider_*` en `ui-events.jsonl`.

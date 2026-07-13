@@ -2,6 +2,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 import json
+import re
 
 import requests
 import streamlit as st
@@ -52,6 +53,7 @@ DEFAULT_CONTAINER_ID = "MSCU7654321"
 DEFAULT_POLICY_ID = "policy-transport-company-valid-order"
 DEFAULT_ACCESS_POLICY_ID = "policy-allow-use"
 DEFAULT_ROLE = "TransportCompany"
+CONTAINER_ID_PATTERN = re.compile(r"^[A-Z]{4}\d{7}$")
 VOCAB_CONTEXT = {"@vocab": "https://w3id.org/edc/v0.0.1/ns/"}
 EDC_CONTEXT = {
     "@vocab": "https://w3id.org/edc/v0.0.1/ns/",
@@ -136,6 +138,40 @@ def friendly_error_message(exc: HttpRequestError, resource: str, action: str) ->
     return f"No se pudo conectar con el servicio para {action_label} el {resource_label}."
 
 
+def resource_label(resource: str) -> str:
+    return {
+        "asset": "Asset",
+        "policy": "Policy",
+        "contract_definition": "Contract Definition",
+        "backend": "backend",
+    }.get(resource, resource)
+
+
+def action_success_message(resource: str, action: str) -> str:
+    label = resource_label(resource)
+    action_labels = {
+        "create": "Creado",
+        "get": "Consultado",
+        "delete": "Borrado",
+        "update": "Actualizado",
+        "validate": "Validado",
+    }
+    action_label = action_labels.get(action, "Procesado")
+    return f"{action_label} {label} con exito."
+
+
+def action_title(resource: str, action: str) -> str:
+    label = resource_label(resource)
+    action_labels = {
+        "create": "Crear",
+        "get": "Consultar",
+        "delete": "Borrar",
+        "update": "Actualizar",
+        "validate": "Validar",
+    }
+    return f"{action_labels.get(action, action.title())} {label}"
+
+
 def save_json(path: Path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -166,6 +202,31 @@ def write_ui_event(step: str, status: str, message: str, provider: str = "", dat
 
 def normalize_backend_url_for_host(url: str) -> str:
     return url.replace("http://regulatory-clearance-api:8081", "http://localhost:8081", 1)
+
+
+def normalize_container_id(container_id: str) -> str:
+    return (container_id or "").strip().upper()
+
+
+def is_valid_container_id(container_id: str) -> bool:
+    return bool(CONTAINER_ID_PATTERN.fullmatch(normalize_container_id(container_id)))
+
+
+def backend_url_container_id(url: str) -> str:
+    match = re.search(r"/containers/([^/]+)/", url or "")
+    if not match:
+        return ""
+    return normalize_container_id(match.group(1))
+
+
+def render_container_validation(container_id: str, *, label: str = "Container ID") -> bool:
+    normalized = normalize_container_id(container_id)
+    if is_valid_container_id(normalized):
+        if container_id != normalized:
+            st.info(f"{label} se usara normalizado como `{normalized}`.")
+        return True
+    st.error(f"{label} invalido. Usa 4 letras y 7 digitos, por ejemplo `{DEFAULT_CONTAINER_ID}`.")
+    return False
 
 
 def build_asset_payload(
@@ -300,6 +361,89 @@ def value_id(value):
     if isinstance(value, dict):
         return value.get("@id") or value.get("id")
     return value
+
+
+def response_body(result: dict):
+    return result.get("body", {}) if isinstance(result, dict) else {}
+
+
+def resource_properties(resource: dict) -> dict:
+    properties = resource.get("properties") or resource.get("edc:properties") or {}
+    return properties if isinstance(properties, dict) else {}
+
+
+def asset_container_id(asset: dict) -> str:
+    properties = resource_properties(asset)
+    return normalize_container_id(
+        properties.get("containerId")
+        or properties.get("edc:containerId")
+        or ""
+    )
+
+
+def policy_container_id(policy_definition: dict) -> str:
+    policy = policy_definition.get("policy") or policy_definition.get("edc:policy") or {}
+    permissions = as_list(policy.get("odrl:permission") or policy.get("permission"))
+    for permission in permissions:
+        if not isinstance(permission, dict):
+            continue
+        constraints = as_list(permission.get("odrl:constraint") or permission.get("constraint"))
+        for constraint in constraints:
+            if not isinstance(constraint, dict):
+                continue
+            left_operand = value_id(constraint.get("odrl:leftOperand") or constraint.get("leftOperand"))
+            if left_operand != "TransportOrder.activeForContainer":
+                continue
+            return value_id(constraint.get("odrl:rightOperand") or constraint.get("rightOperand")) or ""
+    return ""
+
+
+def validate_contract_definition_containers(provider: dict, asset_id: str, contract_policy_id: str) -> bool:
+    try:
+        asset = response_body(get_asset(provider, asset_id))
+        policy = response_body(get_policy(provider, contract_policy_id))
+    except HttpRequestError as exc:
+        st.error(
+            "No se pudo validar que el containerId del Asset y la Policy coincidan. "
+            f"{friendly_error_message(exc, 'contract_definition', 'validate')}"
+        )
+        return False
+
+    selected_asset_container_id = asset_container_id(asset)
+    selected_policy_container_id = policy_container_id(policy)
+
+    if not selected_asset_container_id:
+        st.error(f"El Asset `{asset_id}` no tiene `containerId` en sus properties.")
+        return False
+    if not is_valid_container_id(selected_asset_container_id):
+        st.error(f"El Asset `{asset_id}` tiene un `containerId` invalido: `{selected_asset_container_id}`.")
+        return False
+    if not selected_policy_container_id:
+        st.info("La Contract Policy seleccionada no restringe por containerId.")
+        return True
+    if selected_policy_container_id == "${containerId}":
+        st.success(
+            "La Contract Policy usa `${containerId}` y tomara el containerId del Asset seleccionado "
+            f"(`{selected_asset_container_id}`)."
+        )
+        return True
+
+    normalized_policy_container_id = normalize_container_id(selected_policy_container_id)
+    if not is_valid_container_id(normalized_policy_container_id):
+        st.error(
+            f"La Contract Policy `{contract_policy_id}` tiene un containerId invalido: "
+            f"`{selected_policy_container_id}`."
+        )
+        return False
+    if selected_asset_container_id != normalized_policy_container_id:
+        st.error(
+            "El containerId del Asset y el de la Contract Policy no coinciden: "
+            f"`{selected_asset_container_id}` vs `{normalized_policy_container_id}`."
+        )
+        return False
+
+    st.success(f"ContainerId validado: Asset y Contract Policy usan `{selected_asset_container_id}`.")
+    return True
 
 
 def normalize_contract_definition_payload(contract_definition: dict) -> dict:
@@ -560,12 +704,12 @@ def handle_operation(provider_key: str, resource: str, action: str, operation, *
         result = operation(*args)
         st.session_state[result_key(provider_key, resource)] = {
             "ok": True,
-            "title": f"{action.title()} {resource}",
-            "message": f"Operacion completada con HTTP {result['status_code']}.",
+            "title": action_title(resource, action),
+            "message": action_success_message(resource, action),
             "data": result,
         }
         save_json(generated_response_path(provider_key, resource), result)
-        write_ui_event(event_step, "SUCCESS", f"{resource} {action} completado", provider_key, result)
+        write_ui_event(event_step, "SUCCESS", action_success_message(resource, action), provider_key, result)
     except HttpRequestError as exc:
         message = friendly_error_message(exc, resource, action)
         error_data = {
@@ -577,7 +721,7 @@ def handle_operation(provider_key: str, resource: str, action: str, operation, *
         }
         st.session_state[result_key(provider_key, resource)] = {
             "ok": False,
-            "title": f"{action.title()} {resource}",
+            "title": action_title(resource, action),
             "message": message,
             "data": error_data,
         }
@@ -595,7 +739,22 @@ def render_result(provider_key: str, resource: str):
     else:
         st.error(result["message"])
     with st.expander(f"Detalle: {result['title']}"):
-        st.json(result["data"])
+        st.json(without_http_status_codes(result["data"]))
+
+
+def without_http_status_codes(value):
+    if isinstance(value, dict):
+        return {
+            key: without_http_status_codes(item)
+            for key, item in value.items()
+            if key != "status_code"
+        }
+    if isinstance(value, list):
+        return [without_http_status_codes(item) for item in value]
+    if isinstance(value, str):
+        value = re.sub(r"\bHTTP\s+\d{3}\b", "respuesta del servicio", value)
+        return re.sub(r"\bstatus\s+\d{3}\b", "estado no correcto", value)
+    return value
 
 
 def render_payload(title: str, provider_key: str, name: str, payload: dict):
@@ -739,11 +898,12 @@ def render_asset_tab(provider_key: str, provider: dict):
         key=field_key(provider_key, "asset_description"),
     )
     col1, col2, col3 = st.columns(3)
-    container_id = col1.text_input(
+    container_id_input = col1.text_input(
         "Container ID",
         value=DEFAULT_CONTAINER_ID,
         key=field_key(provider_key, "container_id"),
     )
+    container_id = normalize_container_id(container_id_input)
     authority = col2.text_input(
         "Authority",
         value=provider["default_authority"],
@@ -759,12 +919,28 @@ def render_asset_tab(provider_key: str, provider: dict):
         value=provider["default_endpoint"],
         key=field_key(provider_key, "base_url"),
     )
+    container_valid = render_container_validation(container_id_input)
+    endpoint_container_id = backend_url_container_id(base_url)
+    endpoint_valid = True
+    if endpoint_container_id and not is_valid_container_id(endpoint_container_id):
+        st.error(
+            "El containerId del Backend endpoint no es valido. "
+            f"Usa 4 letras y 7 digitos, por ejemplo `{DEFAULT_CONTAINER_ID}`."
+        )
+        endpoint_valid = False
+    elif endpoint_container_id and endpoint_container_id != container_id:
+        st.error(
+            "El Container ID del Asset y el del Backend endpoint no coinciden: "
+            f"`{container_id}` vs `{endpoint_container_id}`."
+        )
+        endpoint_valid = False
+    can_write_asset = container_valid and endpoint_valid
 
     payload = build_asset_payload(asset_id, name, description, container_id, authority, data_type, base_url)
     render_payload("Ver payload Asset", provider_key, "asset", payload)
 
     with st.form(f"asset_create_form_{provider_key}"):
-        create_asset_submit = st.form_submit_button("Crear Asset")
+        create_asset_submit = st.form_submit_button("Crear Asset", disabled=not can_write_asset)
     if create_asset_submit:
         handle_operation(provider_key, "asset", "create", create_asset, provider, payload)
 
@@ -779,7 +955,11 @@ def render_asset_tab(provider_key: str, provider: dict):
     col_get, col_update, col_delete = st.columns(3)
     if col_get.button("Ver Asset existente", key=f"get_asset_{provider_key}"):
         handle_operation(provider_key, "asset", "get", get_asset, provider, asset_id)
-    if col_update.button("Actualizar Asset existente", key=f"update_asset_{provider_key}", disabled=not confirm_update):
+    if col_update.button(
+        "Actualizar Asset existente",
+        key=f"update_asset_{provider_key}",
+        disabled=not confirm_update or not can_write_asset,
+    ):
         handle_operation(provider_key, "asset", "update", update_asset, provider, asset_id, payload)
     if col_delete.button("Borrar Asset", key=f"delete_asset_{provider_key}", disabled=not confirm_delete):
         handle_operation(provider_key, "asset", "delete", delete_asset, provider, asset_id)
@@ -802,11 +982,13 @@ def render_policy_tab(provider_key: str, provider: dict):
         key=field_key(provider_key, "policy_type"),
     )
     col3, col4 = st.columns(2)
-    container_id = col3.text_input(
+    container_id_input = col3.text_input(
         "Container ID",
         value=st.session_state.get(field_key(provider_key, "container_id"), DEFAULT_CONTAINER_ID),
         key=field_key(provider_key, "policy_container_id"),
     )
+    container_id = normalize_container_id(container_id_input)
+    container_valid = render_container_validation(container_id_input, label="Container ID de la Policy")
     role = col4.text_input(
         "Role requerido",
         value=DEFAULT_ROLE,
@@ -835,7 +1017,10 @@ def render_policy_tab(provider_key: str, provider: dict):
         render_payload("Ver payload Policy", provider_key, "policy", payload)
 
     with st.form(f"policy_create_form_{provider_key}"):
-        create_policy_submit = st.form_submit_button("Crear Policy", disabled=payload is None)
+        create_policy_submit = st.form_submit_button(
+            "Crear Policy",
+            disabled=payload is None or not container_valid,
+        )
     if create_policy_submit:
         handle_operation(provider_key, "policy", "create", create_policy, provider, payload)
 
@@ -854,7 +1039,7 @@ def render_policy_tab(provider_key: str, provider: dict):
     if col_update.button(
         "Actualizar Policy existente",
         key=f"update_policy_{provider_key}",
-        disabled=payload is None or not confirm_update,
+        disabled=payload is None or not confirm_update or not container_valid,
     ):
         handle_operation(provider_key, "policy", "update", update_policy, provider, policy_id, payload)
     if col_delete.button("Borrar Policy", key=f"delete_policy_{provider_key}", disabled=not confirm_delete):
@@ -931,6 +1116,8 @@ def render_contract_definition_tab(provider_key: str, provider: dict):
             "como Access Policy y deja la politica restrictiva en Contract Policy."
         )
 
+    contract_definition_valid = validate_contract_definition_containers(provider, asset_id, contract_policy_id)
+
     payload = build_contract_definition_payload(
         contract_definition_id,
         asset_id,
@@ -940,7 +1127,10 @@ def render_contract_definition_tab(provider_key: str, provider: dict):
     render_payload("Ver payload Contract Definition", provider_key, "contract-definition", payload)
 
     with st.form(f"contract_definition_create_form_{provider_key}"):
-        create_contract_submit = st.form_submit_button("Crear Contract Definition")
+        create_contract_submit = st.form_submit_button(
+            "Crear Contract Definition",
+            disabled=not contract_definition_valid,
+        )
     if create_contract_submit:
         handle_operation(
             provider_key,
@@ -972,7 +1162,7 @@ def render_contract_definition_tab(provider_key: str, provider: dict):
     if col_update.button(
         "Actualizar Contract Definition existente",
         key=f"update_contract_definition_{provider_key}",
-        disabled=not confirm_update,
+        disabled=not confirm_update or not contract_definition_valid,
     ):
         handle_operation(
             provider_key,
