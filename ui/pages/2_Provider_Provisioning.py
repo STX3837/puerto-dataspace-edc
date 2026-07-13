@@ -138,6 +138,40 @@ def friendly_error_message(exc: HttpRequestError, resource: str, action: str) ->
     return f"No se pudo conectar con el servicio para {action_label} el {resource_label}."
 
 
+def resource_label(resource: str) -> str:
+    return {
+        "asset": "Asset",
+        "policy": "Policy",
+        "contract_definition": "Contract Definition",
+        "backend": "backend",
+    }.get(resource, resource)
+
+
+def action_success_message(resource: str, action: str) -> str:
+    label = resource_label(resource)
+    action_labels = {
+        "create": "Creado",
+        "get": "Consultado",
+        "delete": "Borrado",
+        "update": "Actualizado",
+        "validate": "Validado",
+    }
+    action_label = action_labels.get(action, "Procesado")
+    return f"{action_label} {label} con exito."
+
+
+def action_title(resource: str, action: str) -> str:
+    label = resource_label(resource)
+    action_labels = {
+        "create": "Crear",
+        "get": "Consultar",
+        "delete": "Borrar",
+        "update": "Actualizar",
+        "validate": "Validar",
+    }
+    return f"{action_labels.get(action, action.title())} {label}"
+
+
 def save_json(path: Path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -327,6 +361,89 @@ def value_id(value):
     if isinstance(value, dict):
         return value.get("@id") or value.get("id")
     return value
+
+
+def response_body(result: dict):
+    return result.get("body", {}) if isinstance(result, dict) else {}
+
+
+def resource_properties(resource: dict) -> dict:
+    properties = resource.get("properties") or resource.get("edc:properties") or {}
+    return properties if isinstance(properties, dict) else {}
+
+
+def asset_container_id(asset: dict) -> str:
+    properties = resource_properties(asset)
+    return normalize_container_id(
+        properties.get("containerId")
+        or properties.get("edc:containerId")
+        or ""
+    )
+
+
+def policy_container_id(policy_definition: dict) -> str:
+    policy = policy_definition.get("policy") or policy_definition.get("edc:policy") or {}
+    permissions = as_list(policy.get("odrl:permission") or policy.get("permission"))
+    for permission in permissions:
+        if not isinstance(permission, dict):
+            continue
+        constraints = as_list(permission.get("odrl:constraint") or permission.get("constraint"))
+        for constraint in constraints:
+            if not isinstance(constraint, dict):
+                continue
+            left_operand = value_id(constraint.get("odrl:leftOperand") or constraint.get("leftOperand"))
+            if left_operand != "TransportOrder.activeForContainer":
+                continue
+            return value_id(constraint.get("odrl:rightOperand") or constraint.get("rightOperand")) or ""
+    return ""
+
+
+def validate_contract_definition_containers(provider: dict, asset_id: str, contract_policy_id: str) -> bool:
+    try:
+        asset = response_body(get_asset(provider, asset_id))
+        policy = response_body(get_policy(provider, contract_policy_id))
+    except HttpRequestError as exc:
+        st.error(
+            "No se pudo validar que el containerId del Asset y la Policy coincidan. "
+            f"{friendly_error_message(exc, 'contract_definition', 'validate')}"
+        )
+        return False
+
+    selected_asset_container_id = asset_container_id(asset)
+    selected_policy_container_id = policy_container_id(policy)
+
+    if not selected_asset_container_id:
+        st.error(f"El Asset `{asset_id}` no tiene `containerId` en sus properties.")
+        return False
+    if not is_valid_container_id(selected_asset_container_id):
+        st.error(f"El Asset `{asset_id}` tiene un `containerId` invalido: `{selected_asset_container_id}`.")
+        return False
+    if not selected_policy_container_id:
+        st.info("La Contract Policy seleccionada no restringe por containerId.")
+        return True
+    if selected_policy_container_id == "${containerId}":
+        st.success(
+            "La Contract Policy usa `${containerId}` y tomara el containerId del Asset seleccionado "
+            f"(`{selected_asset_container_id}`)."
+        )
+        return True
+
+    normalized_policy_container_id = normalize_container_id(selected_policy_container_id)
+    if not is_valid_container_id(normalized_policy_container_id):
+        st.error(
+            f"La Contract Policy `{contract_policy_id}` tiene un containerId invalido: "
+            f"`{selected_policy_container_id}`."
+        )
+        return False
+    if selected_asset_container_id != normalized_policy_container_id:
+        st.error(
+            "El containerId del Asset y el de la Contract Policy no coinciden: "
+            f"`{selected_asset_container_id}` vs `{normalized_policy_container_id}`."
+        )
+        return False
+
+    st.success(f"ContainerId validado: Asset y Contract Policy usan `{selected_asset_container_id}`.")
+    return True
 
 
 def normalize_contract_definition_payload(contract_definition: dict) -> dict:
@@ -587,12 +704,12 @@ def handle_operation(provider_key: str, resource: str, action: str, operation, *
         result = operation(*args)
         st.session_state[result_key(provider_key, resource)] = {
             "ok": True,
-            "title": f"{action.title()} {resource}",
-            "message": f"Operacion completada con HTTP {result['status_code']}.",
+            "title": action_title(resource, action),
+            "message": action_success_message(resource, action),
             "data": result,
         }
         save_json(generated_response_path(provider_key, resource), result)
-        write_ui_event(event_step, "SUCCESS", f"{resource} {action} completado", provider_key, result)
+        write_ui_event(event_step, "SUCCESS", action_success_message(resource, action), provider_key, result)
     except HttpRequestError as exc:
         message = friendly_error_message(exc, resource, action)
         error_data = {
@@ -604,7 +721,7 @@ def handle_operation(provider_key: str, resource: str, action: str, operation, *
         }
         st.session_state[result_key(provider_key, resource)] = {
             "ok": False,
-            "title": f"{action.title()} {resource}",
+            "title": action_title(resource, action),
             "message": message,
             "data": error_data,
         }
@@ -622,7 +739,22 @@ def render_result(provider_key: str, resource: str):
     else:
         st.error(result["message"])
     with st.expander(f"Detalle: {result['title']}"):
-        st.json(result["data"])
+        st.json(without_http_status_codes(result["data"]))
+
+
+def without_http_status_codes(value):
+    if isinstance(value, dict):
+        return {
+            key: without_http_status_codes(item)
+            for key, item in value.items()
+            if key != "status_code"
+        }
+    if isinstance(value, list):
+        return [without_http_status_codes(item) for item in value]
+    if isinstance(value, str):
+        value = re.sub(r"\bHTTP\s+\d{3}\b", "respuesta del servicio", value)
+        return re.sub(r"\bstatus\s+\d{3}\b", "estado no correcto", value)
+    return value
 
 
 def render_payload(title: str, provider_key: str, name: str, payload: dict):
@@ -797,10 +929,11 @@ def render_asset_tab(provider_key: str, provider: dict):
         )
         endpoint_valid = False
     elif endpoint_container_id and endpoint_container_id != container_id:
-        st.warning(
+        st.error(
             "El Container ID del Asset y el del Backend endpoint no coinciden: "
             f"`{container_id}` vs `{endpoint_container_id}`."
         )
+        endpoint_valid = False
     can_write_asset = container_valid and endpoint_valid
 
     payload = build_asset_payload(asset_id, name, description, container_id, authority, data_type, base_url)
@@ -983,6 +1116,8 @@ def render_contract_definition_tab(provider_key: str, provider: dict):
             "como Access Policy y deja la politica restrictiva en Contract Policy."
         )
 
+    contract_definition_valid = validate_contract_definition_containers(provider, asset_id, contract_policy_id)
+
     payload = build_contract_definition_payload(
         contract_definition_id,
         asset_id,
@@ -992,7 +1127,10 @@ def render_contract_definition_tab(provider_key: str, provider: dict):
     render_payload("Ver payload Contract Definition", provider_key, "contract-definition", payload)
 
     with st.form(f"contract_definition_create_form_{provider_key}"):
-        create_contract_submit = st.form_submit_button("Crear Contract Definition")
+        create_contract_submit = st.form_submit_button(
+            "Crear Contract Definition",
+            disabled=not contract_definition_valid,
+        )
     if create_contract_submit:
         handle_operation(
             provider_key,
@@ -1024,7 +1162,7 @@ def render_contract_definition_tab(provider_key: str, provider: dict):
     if col_update.button(
         "Actualizar Contract Definition existente",
         key=f"update_contract_definition_{provider_key}",
-        disabled=not confirm_update,
+        disabled=not confirm_update or not contract_definition_valid,
     ):
         handle_operation(
             provider_key,

@@ -104,6 +104,15 @@ antes de crear o actualizar Assets y Policies, y también revisa el identificado
 incluido en el `Backend endpoint / baseUrl` cuando apunta a `/containers/.../`.
 La Mock API devuelve `CLEARED` para contenedores válidos no precargados.
 
+Para crear o actualizar un Asset, el `Container ID` del Asset y el incluido en
+el backend endpoint deben coincidir.
+
+El `Container ID` solo es necesario en Policies que restringen por
+`TransportOrder.activeForContainer`. Al crear o actualizar una Contract
+Definition, la UI valida que el `containerId` del Asset y el de la Contract
+Policy seleccionada coincidan. Si la Policy usa `${containerId}`, se considera
+compatible porque EDC lo resuelve desde el Asset.
+
 La pantalla guarda payloads y respuestas en `resources/generated` con prefijo
 `provider-provisioning-*` y escribe eventos `provider_*` en `ui-events.jsonl`.
 

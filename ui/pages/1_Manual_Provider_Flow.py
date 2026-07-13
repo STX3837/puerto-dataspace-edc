@@ -635,11 +635,10 @@ def show_http_error(prefix: str, error: Exception):
     st.session_state.manual_error = str(error)
     st.error(prefix)
     if isinstance(error, HttpRequestError):
-        st.caption(f"{error.method} {error.url}")
-        if error.status_code:
-            st.caption(f"HTTP {error.status_code}")
+        st.caption("La operacion no se pudo completar. Revisa el detalle de la respuesta.")
         if error.body:
-            st.code(error.body, language="text")
+            with st.expander("Detalle de la respuesta", expanded=False):
+                st.write("El servicio devolvio una respuesta de error gestionada por la UI.")
     else:
         with st.expander("Detalle técnico", expanded=False):
             st.code(str(error), language="text")
@@ -716,7 +715,7 @@ def render_download_card(download_response: dict):
     body = download_response.get("body", {})
     status = body.get("status") if isinstance(body, dict) else "DESCARGADO"
     fields = {
-        "HTTP": download_response.get("status_code"),
+        "Resultado": "Descargado con exito",
         "containerId": body.get("containerId") if isinstance(body, dict) else "N/A",
         "authority": body.get("authority") if isinstance(body, dict) else "N/A",
         "status": status,
