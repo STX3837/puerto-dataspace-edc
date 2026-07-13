@@ -165,6 +165,12 @@ MSCU7654321
 La validación de orden activa se realiza contra el Mock API de regulatory
 clearance, que expone datos de demostración para el transportista del Consumer.
 
+Si se consulta un contenedor que no esta precargado pero cuyo identificador es
+válido (`4 letras + 7 digitos`, por ejemplo `TESU1111111`), la Mock API devuelve
+respuestas sintéticas `CLEARED` para Customs, Health y CivilGuard, y valida una
+orden de transporte activa de demo. Los identificadores con formato invalido se
+rechazan con HTTP `400`.
+
 ## Requisitos
 
 - Windows con Docker Desktop en ejecución.
@@ -284,13 +290,13 @@ Instalación:
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r .\ui\requirements.txt
+python -m pip install -r .\ui\requirements.txt
 ```
 
 Ejecución:
 
 ```powershell
-streamlit run .\ui\app.py
+python -m streamlit run .\ui\app.py
 ```
 
 La interfaz ofrece estas acciones:

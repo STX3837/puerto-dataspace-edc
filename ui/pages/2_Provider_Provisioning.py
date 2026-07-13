@@ -2,6 +2,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 import json
+import re
 
 import requests
 import streamlit as st
@@ -52,6 +53,7 @@ DEFAULT_CONTAINER_ID = "MSCU7654321"
 DEFAULT_POLICY_ID = "policy-transport-company-valid-order"
 DEFAULT_ACCESS_POLICY_ID = "policy-allow-use"
 DEFAULT_ROLE = "TransportCompany"
+CONTAINER_ID_PATTERN = re.compile(r"^[A-Z]{4}\d{7}$")
 VOCAB_CONTEXT = {"@vocab": "https://w3id.org/edc/v0.0.1/ns/"}
 EDC_CONTEXT = {
     "@vocab": "https://w3id.org/edc/v0.0.1/ns/",
@@ -166,6 +168,31 @@ def write_ui_event(step: str, status: str, message: str, provider: str = "", dat
 
 def normalize_backend_url_for_host(url: str) -> str:
     return url.replace("http://regulatory-clearance-api:8081", "http://localhost:8081", 1)
+
+
+def normalize_container_id(container_id: str) -> str:
+    return (container_id or "").strip().upper()
+
+
+def is_valid_container_id(container_id: str) -> bool:
+    return bool(CONTAINER_ID_PATTERN.fullmatch(normalize_container_id(container_id)))
+
+
+def backend_url_container_id(url: str) -> str:
+    match = re.search(r"/containers/([^/]+)/", url or "")
+    if not match:
+        return ""
+    return normalize_container_id(match.group(1))
+
+
+def render_container_validation(container_id: str, *, label: str = "Container ID") -> bool:
+    normalized = normalize_container_id(container_id)
+    if is_valid_container_id(normalized):
+        if container_id != normalized:
+            st.info(f"{label} se usara normalizado como `{normalized}`.")
+        return True
+    st.error(f"{label} invalido. Usa 4 letras y 7 digitos, por ejemplo `{DEFAULT_CONTAINER_ID}`.")
+    return False
 
 
 def build_asset_payload(
@@ -739,11 +766,12 @@ def render_asset_tab(provider_key: str, provider: dict):
         key=field_key(provider_key, "asset_description"),
     )
     col1, col2, col3 = st.columns(3)
-    container_id = col1.text_input(
+    container_id_input = col1.text_input(
         "Container ID",
         value=DEFAULT_CONTAINER_ID,
         key=field_key(provider_key, "container_id"),
     )
+    container_id = normalize_container_id(container_id_input)
     authority = col2.text_input(
         "Authority",
         value=provider["default_authority"],
@@ -759,12 +787,27 @@ def render_asset_tab(provider_key: str, provider: dict):
         value=provider["default_endpoint"],
         key=field_key(provider_key, "base_url"),
     )
+    container_valid = render_container_validation(container_id_input)
+    endpoint_container_id = backend_url_container_id(base_url)
+    endpoint_valid = True
+    if endpoint_container_id and not is_valid_container_id(endpoint_container_id):
+        st.error(
+            "El containerId del Backend endpoint no es valido. "
+            f"Usa 4 letras y 7 digitos, por ejemplo `{DEFAULT_CONTAINER_ID}`."
+        )
+        endpoint_valid = False
+    elif endpoint_container_id and endpoint_container_id != container_id:
+        st.warning(
+            "El Container ID del Asset y el del Backend endpoint no coinciden: "
+            f"`{container_id}` vs `{endpoint_container_id}`."
+        )
+    can_write_asset = container_valid and endpoint_valid
 
     payload = build_asset_payload(asset_id, name, description, container_id, authority, data_type, base_url)
     render_payload("Ver payload Asset", provider_key, "asset", payload)
 
     with st.form(f"asset_create_form_{provider_key}"):
-        create_asset_submit = st.form_submit_button("Crear Asset")
+        create_asset_submit = st.form_submit_button("Crear Asset", disabled=not can_write_asset)
     if create_asset_submit:
         handle_operation(provider_key, "asset", "create", create_asset, provider, payload)
 
@@ -779,7 +822,11 @@ def render_asset_tab(provider_key: str, provider: dict):
     col_get, col_update, col_delete = st.columns(3)
     if col_get.button("Ver Asset existente", key=f"get_asset_{provider_key}"):
         handle_operation(provider_key, "asset", "get", get_asset, provider, asset_id)
-    if col_update.button("Actualizar Asset existente", key=f"update_asset_{provider_key}", disabled=not confirm_update):
+    if col_update.button(
+        "Actualizar Asset existente",
+        key=f"update_asset_{provider_key}",
+        disabled=not confirm_update or not can_write_asset,
+    ):
         handle_operation(provider_key, "asset", "update", update_asset, provider, asset_id, payload)
     if col_delete.button("Borrar Asset", key=f"delete_asset_{provider_key}", disabled=not confirm_delete):
         handle_operation(provider_key, "asset", "delete", delete_asset, provider, asset_id)
@@ -802,11 +849,13 @@ def render_policy_tab(provider_key: str, provider: dict):
         key=field_key(provider_key, "policy_type"),
     )
     col3, col4 = st.columns(2)
-    container_id = col3.text_input(
+    container_id_input = col3.text_input(
         "Container ID",
         value=st.session_state.get(field_key(provider_key, "container_id"), DEFAULT_CONTAINER_ID),
         key=field_key(provider_key, "policy_container_id"),
     )
+    container_id = normalize_container_id(container_id_input)
+    container_valid = render_container_validation(container_id_input, label="Container ID de la Policy")
     role = col4.text_input(
         "Role requerido",
         value=DEFAULT_ROLE,
@@ -835,7 +884,10 @@ def render_policy_tab(provider_key: str, provider: dict):
         render_payload("Ver payload Policy", provider_key, "policy", payload)
 
     with st.form(f"policy_create_form_{provider_key}"):
-        create_policy_submit = st.form_submit_button("Crear Policy", disabled=payload is None)
+        create_policy_submit = st.form_submit_button(
+            "Crear Policy",
+            disabled=payload is None or not container_valid,
+        )
     if create_policy_submit:
         handle_operation(provider_key, "policy", "create", create_policy, provider, payload)
 
@@ -854,7 +906,7 @@ def render_policy_tab(provider_key: str, provider: dict):
     if col_update.button(
         "Actualizar Policy existente",
         key=f"update_policy_{provider_key}",
-        disabled=payload is None or not confirm_update,
+        disabled=payload is None or not confirm_update or not container_valid,
     ):
         handle_operation(provider_key, "policy", "update", update_policy, provider, policy_id, payload)
     if col_delete.button("Borrar Policy", key=f"delete_policy_{provider_key}", disabled=not confirm_delete):
