@@ -144,8 +144,8 @@ http://host.docker.internal:8765
 
 Este mecanismo es solo para entorno local de demo.
 
-Las paginas de flujo manual y provisioning funcionan tanto en Streamlit local
-como en la UI Docker, adaptando automaticamente las URLs `localhost`,
+Las páginas de flujo manual y provisioning funcionan tanto en Streamlit local
+como en la UI Docker, adaptando automáticamente las URLs `localhost`,
 `host.docker.internal` y servicios Compose.
 
 El orquestador solo acepta comandos de lista blanca y no permite ejecutar
@@ -269,7 +269,7 @@ docker compose -f .\docker-compose.infra.yml -f .\docker-compose.edc.yml up -d
 
 ## Puertos principales
 
-| Stack | Identity Hub | Management API | DSP | Control API | Data Plane publico | PostgreSQL |
+| Stack | Identity Hub | Management API | DSP | Control API | Data Plane público | PostgreSQL |
 |---|---:|---:|---:|---:|---:|---:|
 | Consumer | `7280-7284` | `29193` | `29292` | `29194` | `29294` | `7433` |
 | Customs | `7180-7184` | `19193` | `19292` | `19194` | `19294` | `7432` |
@@ -314,10 +314,10 @@ MSCU7654321
 La validación de orden activa se realiza contra el Mock API de regulatory
 clearance, que expone datos de demostración para el transportista del Consumer.
 
-Si se consulta un contenedor que no esta precargado pero cuyo identificador es
+Si se consulta un contenedor que no está precargado pero cuyo identificador es
 válido (`4 letras + 7 digitos`, por ejemplo `TESU1111111`), la Mock API devuelve
 respuestas sintéticas `CLEARED` para Customs, Health y CivilGuard, y valida una
-orden de transporte activa de demo. Los identificadores con formato invalido se
+orden de transporte activa de demo. Los identificadores con formato inválido se
 rechazan con HTTP `400`.
 
 ## Requisitos
@@ -461,7 +461,7 @@ La interfaz ofrece estas acciones:
 - **Abrir flujo manual por Provider**: abre una página para ejecutar
   manualmente catálogo, selección de oferta, negociación, transferencia, EDR y
   descarga contra un Provider.
-- **Abrir provisioning de Provider**: abre una pagina para crear, consultar,
+- **Abrir provisioning de Provider**: abre una página para crear, consultar,
   actualizar o borrar Assets, Policies y Contract Definitions desde la
   Management API de cada Provider.
 
@@ -475,7 +475,7 @@ segundo durante la ejecución y muestra:
 - flujo global y estado por Provider;
 - JSON originales y timeline de eventos.
 
-La pagina manual y la pantalla de provisioning requieren que la infraestructura
+La página manual y la pantalla de provisioning requieren que la infraestructura
 y los servicios EDC estén levantados previamente. Pueden usarse después de
 **Arrancar EDC sin smoke** o tras ejecutar `start-edc-three-providers.ps1` desde
 consola.
@@ -527,7 +527,7 @@ compatible porque EDC lo resuelve desde el Asset.
 Las actualizaciones de Asset y Contract Definition usan `PUT`, por lo que no
 intentan borrar recursos ya referenciados por acuerdos o negociaciones. Las
 Contract Definitions asociadas al Asset se conservan. En Policies, el endpoint
-de EDC no expone `PUT`; por eso la UI usa `DELETE+POST` y recrea despues las
+de EDC no expone `PUT`; por eso la UI usa `DELETE+POST` y recrea después las
 Contract Definitions asociadas con los mismos datos.
 
 La UI lee eventos desde:

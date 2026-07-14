@@ -721,9 +721,22 @@ def render_full_value(label: str, value):
     st.code(str(value or "Pendiente"), language="text")
 
 
-def render_result_card(title: str, status: str, fields: dict, copyable_fields=None, full_fields=None):
+def render_text_value(label: str, value):
+    st.caption(label)
+    st.markdown(f"**{str(value or 'Pendiente')}**")
+
+
+def render_result_card(
+    title: str,
+    status: str,
+    fields: dict,
+    copyable_fields=None,
+    full_fields=None,
+    text_fields=None,
+):
     copyable_fields = set(copyable_fields or [])
     full_fields = set(full_fields or [])
+    text_fields = set(text_fields or [])
     badge = status_badge(status)
     if badge == "SUCCESS":
         st.success(f"{title}: {status}")
@@ -742,6 +755,9 @@ def render_result_card(title: str, status: str, fields: dict, copyable_fields=No
             elif label in full_fields:
                 with column:
                     render_full_value(label, value)
+            elif label in text_fields:
+                with column:
+                    render_text_value(label, value)
             else:
                 column.metric(label, str(value or "Pendiente"))
 
@@ -750,12 +766,18 @@ def render_download_card(download_response: dict):
     body = download_response.get("body", {})
     status = body.get("status") if isinstance(body, dict) else "DESCARGADO"
     fields = {
-        "Resultado": "Descargado con exito",
+        "Resultado": "Descargado con éxito",
         "containerId": body.get("containerId") if isinstance(body, dict) else "N/A",
         "authority": body.get("authority") if isinstance(body, dict) else "N/A",
         "status": status,
     }
-    render_result_card("Dato descargado", status or "SUCCESS", fields, full_fields={"authority"})
+    render_result_card(
+        "Dato descargado",
+        status or "SUCCESS",
+        fields,
+        full_fields={"authority"},
+        text_fields={"Resultado"},
+    )
     st.caption(f"Endpoint usado: `{download_response.get('endpoint')}`")
 
 
