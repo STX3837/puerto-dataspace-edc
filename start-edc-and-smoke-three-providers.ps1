@@ -577,11 +577,16 @@ Write-UiEvent -Step "infra_check" -Status "RUNNING" -Message "Comprobando infrae
 
 docker compose -f docker-compose.edc.yml up -d `
   consumer-identityhub-postgres provider-identityhub-postgres `
-  health-identityhub-postgres civilguard-identityhub-postgres issuer-postgres `
-  mock-api
+  health-identityhub-postgres civilguard-identityhub-postgres issuer-postgres
 
 if ($LASTEXITCODE -ne 0) {
   throw "No se pudieron arrancar las bases de datos de infraestructura EDC"
+}
+
+docker compose -f docker-compose.edc.yml up -d --build --force-recreate mock-api
+
+if ($LASTEXITCODE -ne 0) {
+  throw "No se pudo construir o arrancar la Mock API"
 }
 
 Wait-PostgresReady "consumer-identityhub-postgres"
