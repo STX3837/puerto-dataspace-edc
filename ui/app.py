@@ -1,9 +1,13 @@
 from datetime import datetime
 from pathlib import Path
 import json
+import os
+import shutil
 import subprocess
 
 import streamlit as st
+
+from common import HttpRequestError, host_url, request_json
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,6 +19,9 @@ MAIN_SCRIPT = ROOT / "start-edc-and-smoke-three-providers.ps1"
 START_ONLY_SCRIPT = ROOT / "start-edc-three-providers.ps1"
 SMOKE_SCRIPT = ROOT / "smoke-test-three-providers.ps1"
 AUTO_REFRESH_INTERVAL = "1s"
+DEFAULT_ORCHESTRATOR_URL = "http://host.docker.internal:8765" if os.getenv("RUNNING_IN_DOCKER", "false").lower() == "true" else "http://localhost:8765"
+ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", DEFAULT_ORCHESTRATOR_URL).rstrip("/")
+ORCHESTRATOR_TOKEN = os.getenv("ORCHESTRATOR_TOKEN", "")
 
 GLOBAL_STEPS = [
     "script_started",
@@ -276,6 +283,8 @@ def display_status(events: list[dict], step: str) -> str:
 def should_auto_refresh(events: list[dict]) -> bool:
     if current_run_state().get("running"):
         return True
+    if orchestrator_has_running_run():
+        return True
 
     latest = latest_event(events)
     if not latest or global_status(events) != "RUNNING":
@@ -301,46 +310,148 @@ def fragment_decorator(run_every: str | None):
     return fragment(run_every=run_every)
 
 
+def orchestrator_headers() -> dict:
+    return {"X-Orchestrator-Token": ORCHESTRATOR_TOKEN} if ORCHESTRATOR_TOKEN else {}
+
+
+def orchestrator_request(method: str, path: str, timeout: int = 10):
+    return request_json(
+        method,
+        f"{ORCHESTRATOR_URL}{path}",
+        headers=orchestrator_headers(),
+        timeout=timeout,
+    )
+
+
+def orchestrator_available() -> bool:
+    try:
+        request_json("GET", f"{ORCHESTRATOR_URL}/health", timeout=3)
+        return True
+    except HttpRequestError:
+        return False
+
+
+def run_orchestrator_command(command_name: str):
+    return orchestrator_request("POST", f"/commands/{command_name}/run", timeout=10)
+
+
+def list_orchestrator_runs() -> list[dict]:
+    try:
+        runs = orchestrator_request("GET", "/runs", timeout=5)
+        return runs if isinstance(runs, list) else []
+    except HttpRequestError:
+        return []
+
+
+def get_run_log(run_id: str) -> str:
+    try:
+        log = orchestrator_request("GET", f"/runs/{run_id}/log", timeout=5)
+        return log if isinstance(log, str) else json.dumps(log, indent=2, ensure_ascii=False)
+    except HttpRequestError as exc:
+        return f"No se pudo leer el log desde {exc.url}: {exc}"
+
+
+def orchestrator_has_running_run() -> bool:
+    return any(run.get("status") == "RUNNING" for run in list_orchestrator_runs())
+
+
+def render_orchestrator_panel(available: bool, runs: list[dict]):
+    st.subheader("Orquestador local")
+    effective_url = host_url(ORCHESTRATOR_URL)
+    col1, col2 = st.columns([2, 1])
+    col1.code(effective_url, language="text")
+    col2.metric("Estado", "Disponible" if available else "No disponible")
+
+    if not available:
+        st.warning("Arranca la API orquestadora local para habilitar los botones de ejecución.")
+        st.code(".\\scripts\\orchestrator-start.ps1", language="powershell")
+        return
+
+    if not runs:
+        st.caption("No hay ejecuciones registradas todavía.")
+        return
+
+    st.markdown("#### Últimos runs")
+    st.dataframe(
+        [
+            {
+                "run_id": run.get("run_id", ""),
+                "comando": run.get("command_name", ""),
+                "estado": run.get("status", ""),
+                "pid": run.get("pid", ""),
+                "inicio": run.get("started_at", ""),
+                "fin": run.get("finished_at", ""),
+            }
+            for run in runs[:10]
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
 def render_script_controls():
     st.subheader("Ejecución")
     state = current_run_state()
     running = state.get("running", False)
+    scripts_available = shutil.which("powershell.exe") is not None
+    available = orchestrator_available()
+    runs = list_orchestrator_runs() if available else []
+    orchestrator_running = any(run.get("status") == "RUNNING" for run in runs)
+
+    render_orchestrator_panel(available, runs)
 
     col1, col2, col3, col4 = st.columns([1, 1, 1, 3])
     with col1:
-        if st.button("Ejecutar demo completa", disabled=running):
-            ok, message = start_main_script()
-            if ok:
-                st.success(message)
+        if st.button("Ejecutar demo completa", disabled=not available or orchestrator_running):
+            try:
+                reset_generated_state()
+                run = run_orchestrator_command("demo_full")
+                st.success(f"Demo completa lanzada. Run: {run.get('run_id')}")
                 st.rerun()
-            else:
-                st.warning(message)
+            except HttpRequestError as exc:
+                if exc.status_code == 409:
+                    st.warning("Ya hay un proceso en ejecución.")
+                else:
+                    st.error(f"No se pudo lanzar la demo: {exc}")
 
     with col2:
-        if st.button("Arrancar EDC sin smoke", disabled=running):
-            ok, message = start_services_script()
-            if ok:
-                st.success(message)
+        if st.button("Arrancar EDC sin smoke", disabled=not available or orchestrator_running):
+            try:
+                reset_generated_state()
+                run = run_orchestrator_command("edc_start")
+                st.success(f"Arranque EDC lanzado. Run: {run.get('run_id')}")
                 st.rerun()
-            else:
-                st.warning(message)
+            except HttpRequestError as exc:
+                if exc.status_code == 409:
+                    st.warning("Ya hay un proceso en ejecución.")
+                else:
+                    st.error(f"No se pudo arrancar EDC: {exc}")
 
     with col3:
-        if st.button("Ejecutar solo smoke test", disabled=running):
-            ok, message = start_smoke_script()
-            if ok:
-                st.success(message)
+        if st.button("Ejecutar solo smoke test", disabled=not available or orchestrator_running):
+            try:
+                reset_generated_state()
+                run = run_orchestrator_command("smoke_only")
+                st.success(f"Smoke test lanzado. Run: {run.get('run_id')}")
                 st.rerun()
-            else:
-                st.warning(message)
+            except HttpRequestError as exc:
+                if exc.status_code == 409:
+                    st.warning("Ya hay un proceso en ejecución.")
+                else:
+                    st.error(f"No se pudo lanzar el smoke test: {exc}")
 
     with col4:
-        if running:
-            st.info(f"Script en ejecución. PID: {state.get('pid')}. Auto-recarga suave cada 1 segundo.")
+        if orchestrator_running:
+            active = next((run for run in runs if run.get("status") == "RUNNING"), {})
+            st.info(f"Run en ejecución: {active.get('command_name')} · PID {active.get('pid')}")
+        elif running:
+            st.info(f"Script local en ejecución. PID: {state.get('pid')}.")
+        elif not available:
+            st.caption("Orquestador no disponible. Los botones quedan deshabilitados.")
         elif state.get("pid"):
-            st.caption(f"Última ejecución registrada: PID {state.get('pid')}. Log: {RUN_LOG_FILE}")
+            st.caption(f"Última ejecución registrada: PID {state.get('pid')}.")
         else:
-            st.caption("Puedes lanzar el flujo completo desde la UI o desde una consola.")
+            st.caption("Puedes lanzar el flujo completo desde la UI usando el orquestador local.")
 
 
 def progress_percent(events: list[dict]) -> int:

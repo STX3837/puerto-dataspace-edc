@@ -50,6 +50,8 @@ launchers/demo-e2e/edc-config.properties
 *.hprof
 
 .env
+.venv/
+.venv-orchestrator/
 runtime_settings.properties
 generated_backend.tf
 
@@ -66,6 +68,10 @@ provider-last.log
 consumer-last.log
 resources/generated/*
 !resources/generated/.gitkeep
+!resources/generated/orchestrator-runs/
+resources/generated/orchestrator-runs/*
+!resources/generated/orchestrator-runs/.gitkeep
+resources/generated/orchestrator.pid
 *.log
 __pycache__/
 *.py[cod]

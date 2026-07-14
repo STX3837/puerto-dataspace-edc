@@ -1,0 +1,27 @@
+services:
+  ui:
+    build:
+      context: .
+      dockerfile: ui/Dockerfile
+    container_name: puerto-dataspace-ui
+    ports:
+      - "${UI_PORT:-8501}:8501"
+    volumes:
+      - ./resources/generated:/app/resources/generated
+      - ./resources/policies:/app/resources/policies:ro
+      - ./infra/keycloak/import:/app/infra/keycloak/import:ro
+    environment:
+      STREAMLIT_SERVER_HEADLESS: "true"
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+      RUNNING_IN_DOCKER: "true"
+      PUERTO_DATASPACE_DOCKER: "true"
+      ORCHESTRATOR_URL: ${ORCHESTRATOR_URL:-http://host.docker.internal:8765}
+      ORCHESTRATOR_TOKEN: ${ORCHESTRATOR_TOKEN:-dev-orchestrator-token}
+      CONSUMER_MANAGEMENT_URL: "http://consumer-controlplane:29193/management"
+      CUSTOMS_MANAGEMENT_URL: "http://provider-controlplane:19193/management"
+      HEALTH_MANAGEMENT_URL: "http://health-controlplane:19193/management"
+      CIVILGUARD_MANAGEMENT_URL: "http://civilguard-controlplane:19193/management"
+    depends_on:
+      - keycloak
+      - vault
+    restart: unless-stopped
