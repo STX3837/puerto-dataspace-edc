@@ -47,13 +47,13 @@ container_health_status = {
     "MSCU1234567": {
         "containerId": "MSCU1234567",
         "authority": "HEALTH_INSPECTION",
-        "status": "CLEARED",
+        "status": "PENDING",
         "lastUpdatedAt": "2026-06-25T10:30:00Z"
     },
     "MSCU7654321": {
         "containerId": "MSCU7654321",
         "authority": "HEALTH_INSPECTION",
-        "status": "PENDING",
+        "status": "CLEARED",
         "lastUpdatedAt": "2026-06-25T10:35:00Z"
     }
 }

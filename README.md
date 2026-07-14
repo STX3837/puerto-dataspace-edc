@@ -4,6 +4,153 @@ Prototipo de Espacio de Datos portuario construido con Eclipse Dataspace
 Components (EDC), Dataspace Protocol (DSP) y Decentralized Claims Protocol
 (DCP).
 
+## Modo servicio local
+
+El proyecto puede arrancarse como servicio demostrador local mediante Docker
+Compose. Este modo levanta infraestructura, stack EDC y la UI Streamlit.
+
+### Arranque
+
+```powershell
+.\scripts\service-start.ps1
+```
+
+Equivalente manual:
+
+```powershell
+docker compose -f .\docker-compose.infra.yml -f .\docker-compose.edc.yml -f .\docker-compose.service.yml up -d --build
+```
+
+### URLs
+
+- UI Streamlit: http://localhost:8501
+- Keycloak: http://localhost:8080
+- Vault: http://localhost:8200
+- Mock API: http://localhost:8081
+
+Si el puerto `8501` ya esta ocupado, cambia `UI_PORT` en `.env`, por ejemplo
+`UI_PORT=8502`.
+
+### Ejecutar flujo completo
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\start-edc-and-smoke-three-providers.ps1
+```
+
+Con la API orquestadora local activa, la UI Docker tambien puede lanzar este
+flujo desde sus botones.
+
+### Estado
+
+```powershell
+.\scripts\service-status.ps1
+```
+
+### Logs
+
+```powershell
+.\scripts\service-logs.ps1 ui
+.\scripts\service-logs.ps1 consumer-controlplane
+```
+
+### Parada
+
+```powershell
+.\scripts\service-stop.ps1
+```
+
+Este comando conserva volumenes. No usar `down -v` salvo que se quiera borrar
+el estado persistido.
+
+> Este modo es un servicio demostrador local, no un despliegue productivo.
+> Vault esta en modo dev, Keycloak usa configuracion de demo y los participantes
+> se ejecutan en una misma maquina.
+
+Consulta tambien [`SERVICIO.md`](SERVICIO.md) para ver el contrato operativo:
+comandos, endpoints, artefactos de salida y criterio de servicio listo.
+
+## API orquestadora local
+
+Cuando la UI se ejecuta dentro de Docker, no puede ejecutar directamente
+PowerShell ni Docker del host. Para habilitar los botones de ejecucion se usa una
+API orquestadora local que corre en Windows y solo permite comandos predefinidos.
+El código, README y dependencias de esta API estan en `orchestrator_api/`.
+
+### Arranque recomendado
+
+```powershell
+.\scripts\orchestrator-start.ps1 -Background
+.\scripts\service-start.ps1
+```
+
+Tambien puedes arrancar el orquestador en primer plano en una terminal separada:
+
+```powershell
+.\scripts\orchestrator-start.ps1
+```
+
+### Conflicto con Vault
+
+Si Docker indica que ya existe un contenedor `vault`, libera ese nombre y vuelve
+a arrancar:
+
+```powershell
+docker stop vault
+docker rm vault
+.\scripts\service-start.ps1
+```
+
+No uses `docker compose down -v` salvo que quieras borrar volumenes.
+
+### Conflicto con puerto 8765
+
+Si el puerto `8765` esta ocupado, comprueba si ya es el orquestador:
+
+```powershell
+Invoke-RestMethod http://localhost:8765/health
+```
+
+Si responde, el orquestador ya esta activo y no hace falta arrancarlo otra vez.
+
+### Abrir UI
+
+```text
+http://localhost:8501
+```
+
+Si `8501` esta ocupado, configurar `UI_PORT` en `.env`.
+
+Con el orquestador activo, la UI puede lanzar:
+
+- Arrancar EDC sin smoke.
+- Ejecutar demo completa.
+- Ejecutar solo smoke test.
+
+La UI muestra el estado de disponibilidad del orquestador y una tabla de runs.
+No muestra el log completo del run en pantalla; los logs se conservan en
+`resources/generated/orchestrator-runs/`.
+
+La API escucha por defecto en:
+
+```text
+http://localhost:8765
+```
+
+Desde Docker, la UI accede al host mediante:
+
+```text
+http://host.docker.internal:8765
+```
+
+Este mecanismo es solo para entorno local de demo.
+
+Las paginas de flujo manual y provisioning funcionan tanto en Streamlit local
+como en la UI Docker, adaptando automaticamente las URLs `localhost`,
+`host.docker.internal` y servicios Compose.
+
+El orquestador solo acepta comandos de lista blanca y no permite ejecutar
+comandos arbitrarios desde HTTP.
+
 El proyecto representa la autorización de retirada de un contenedor. Un Consumer,
 que actúa como empresa transportista, consulta y combina información procedente
 de tres Providers:
@@ -144,6 +291,8 @@ La infraestructura común está en
 [`docker-compose.infra.yml`](docker-compose.infra.yml). Los componentes EDC,
 Identity Hub, Issuer Service, Mock API y PostgreSQL propios del proyecto están en
 [`docker-compose.edc.yml`](docker-compose.edc.yml).
+La UI Docker del modo servicio está en
+[`docker-compose.service.yml`](docker-compose.service.yml).
 
 ## Usage Policy actual
 
@@ -278,6 +427,8 @@ Los artefactos de ejecución se escriben en `resources/generated/`:
 - `edr-*-response.json`: Endpoint Data References.
 - `downloaded-*-clearance.json`: datos descargados de cada Provider.
 - `aggregated-clearance-status.json`: resultado final consolidado.
+- `orchestrator-runs/*.json`: metadatos de runs lanzados por la API orquestadora.
+- `orchestrator-runs/*.log`: logs de runs lanzados por la API orquestadora.
 
 ## Interfaz visual
 
@@ -302,8 +453,10 @@ python -m streamlit run .\ui\app.py
 La interfaz ofrece estas acciones:
 
 - **Ejecutar demo completa**: ejecuta
-  `start-edc-and-smoke-three-providers.ps1`.
-- **Arrancar EDC sin smoke**: ejecuta `start-edc-three-providers.ps1`.
+  `start-edc-and-smoke-three-providers.ps1` mediante el orquestador cuando está
+  en Docker.
+- **Arrancar EDC sin smoke**: ejecuta `scripts/edc-start.ps1` desde el
+  orquestador o el flujo local equivalente.
 - **Ejecutar solo smoke test**: ejecuta `smoke-test-three-providers.ps1`.
 - **Abrir flujo manual por Provider**: abre una página para ejecutar
   manualmente catálogo, selección de oferta, negociación, transferencia, EDR y
@@ -312,9 +465,9 @@ La interfaz ofrece estas acciones:
   actualizar o borrar Assets, Policies y Contract Definitions desde la
   Management API de cada Provider.
 
-Mientras un script está en ejecución, los botones quedan bloqueados para evitar
-ejecuciones solapadas. La UI usa recarga suave cada segundo durante la ejecución
-y muestra:
+Mientras un script o run del orquestador está en ejecución, los botones quedan
+bloqueados para evitar ejecuciones solapadas. La UI usa recarga suave cada
+segundo durante la ejecución y muestra:
 
 - estado global, progreso, último evento y timestamp;
 - artefactos visuales y resultado agregado;

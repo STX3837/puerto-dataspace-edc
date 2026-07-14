@@ -4,10 +4,16 @@ import base64
 from datetime import datetime, timezone
 from pathlib import Path
 import json
+import os
+import sys
 import time
+from urllib.parse import urlparse, urlunparse
 
 import requests
 import streamlit as st
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import common as ui_common
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -15,7 +21,7 @@ RESOURCES = ROOT / "resources"
 GENERATED_DIR = RESOURCES / "generated"
 EVENTS_FILE = GENERATED_DIR / "ui-events.jsonl"
 
-CONSUMER_MGMT = "http://localhost:29193/management"
+CONSUMER_MGMT = os.getenv("CONSUMER_MANAGEMENT_URL", "http://localhost:29193/management")
 CONSUMER_KEY = "consumer-api-key"
 
 PROVIDERS = {
@@ -23,7 +29,7 @@ PROVIDERS = {
         "label": "Customs",
         "did": "did:web:provider-identityhub%3A8183:provider",
         "address": "http://provider-controlplane:19292/protocol",
-        "management_url": "http://localhost:19193/management",
+        "management_url": os.getenv("CUSTOMS_MANAGEMENT_URL", "http://localhost:19193/management"),
         "api_key": "provider-api-key",
         "asset_id": "asset-clearance-mscu7654321",
         "catalog_request": RESOURCES / "catalog" / "catalog-request.json",
@@ -36,7 +42,7 @@ PROVIDERS = {
         "label": "Health",
         "did": "did:web:health-identityhub%3A8183:health",
         "address": "http://health-controlplane:19292/protocol",
-        "management_url": "http://localhost:21193/management",
+        "management_url": os.getenv("HEALTH_MANAGEMENT_URL", "http://localhost:21193/management"),
         "api_key": "provider-api-key",
         "asset_id": "asset-health-clearance-mscu7654321",
         "catalog_request": RESOURCES / "catalog" / "catalog-request-health.json",
@@ -49,7 +55,7 @@ PROVIDERS = {
         "label": "CivilGuard",
         "did": "did:web:civilguard-identityhub%3A8183:civilguard",
         "address": "http://civilguard-controlplane:19292/protocol",
-        "management_url": "http://localhost:22193/management",
+        "management_url": os.getenv("CIVILGUARD_MANAGEMENT_URL", "http://localhost:22193/management"),
         "api_key": "provider-api-key",
         "asset_id": "asset-civilguard-clearance-mscu7654321",
         "catalog_request": RESOURCES / "catalog" / "catalog-request-civilguard.json",
@@ -116,27 +122,16 @@ def write_ui_event(step: str, status: str, provider: str, message: str, data=Non
 
 def request_json(method: str, url: str, headers=None, json_body=None, timeout=30):
     try:
-        response = requests.request(
+        data, _effective_url = ui_common.request_json_with_fallback(
             method,
             url,
             headers=headers,
-            json=json_body,
+            json_body=json_body,
             timeout=timeout,
         )
-    except requests.RequestException as exc:
-        raise HttpRequestError(method, url, message=str(exc)) from exc
-
-    text = response.text
-    if not 200 <= response.status_code < 300:
-        raise HttpRequestError(method, url, response.status_code, text)
-
-    if not text:
-        return {}
-
-    try:
-        return response.json()
-    except ValueError:
-        return text
+        return data
+    except ui_common.HttpRequestError as exc:
+        raise HttpRequestError(method, exc.url, exc.status_code, exc.body, str(exc)) from exc
 
 
 def consumer_headers():
@@ -562,50 +557,88 @@ def request_edr(transfer_id: str) -> dict:
     )
 
 
-def normalize_public_endpoint(endpoint: str) -> str:
-    replacements = {
-        "http://provider-dataplane:19294": "http://localhost:19294",
-        "http://health-dataplane:19294": "http://localhost:21294",
-        "http://health-dataplane:21294": "http://localhost:21294",
-        "http://civilguard-dataplane:19294": "http://localhost:22294",
-        "http://civilguard-dataplane:22294": "http://localhost:22294",
-        "http://consumer-dataplane:29291": "http://localhost:29291",
-        "http://consumer-dataplane:29294": "http://localhost:29294",
+def replace_netloc(url: str, host: str, port: str | int | None = None) -> str:
+    parsed = urlparse(url)
+    if not parsed.netloc:
+        return url
+    selected_port = port or parsed.port
+    netloc = f"{host}:{selected_port}" if selected_port else host
+    return urlunparse(parsed._replace(netloc=netloc))
+
+
+def public_endpoint_candidates(endpoint: str) -> list[str]:
+    parsed = urlparse(endpoint)
+    candidates = [endpoint]
+    local_ports = {
+        "provider-dataplane": "19294",
+        "health-dataplane": "21294",
+        "civilguard-dataplane": "22294",
+        "consumer-dataplane": "29294",
     }
-    normalized = endpoint
-    for old, new in replacements.items():
-        normalized = normalized.replace(old, new)
-    return normalized
+
+    if parsed.hostname in local_ports:
+        if ui_common.running_in_docker():
+            candidates.append(endpoint)
+            candidates.append(replace_netloc(endpoint, "host.docker.internal", local_ports[parsed.hostname]))
+        else:
+            candidates.append(replace_netloc(endpoint, "localhost", local_ports[parsed.hostname]))
+
+    if parsed.hostname in {"localhost", "127.0.0.1"}:
+        if ui_common.running_in_docker():
+            candidates.append(replace_netloc(endpoint, "host.docker.internal"))
+        else:
+            candidates.append(endpoint)
+
+    if parsed.hostname == "host.docker.internal" and not ui_common.running_in_docker():
+        candidates.append(replace_netloc(endpoint, "localhost"))
+
+    deduped = []
+    for candidate in candidates:
+        if candidate and candidate not in deduped:
+            deduped.append(candidate)
+    return deduped
+
+
+def normalize_public_endpoint(endpoint: str) -> str:
+    return public_endpoint_candidates(endpoint)[0]
 
 
 def download_data(edr: dict) -> dict:
-    endpoint = normalize_public_endpoint(edr.get("endpoint", ""))
+    endpoint = edr.get("endpoint", "")
     token = edr.get("authorization") or edr.get("authCode")
     if not endpoint or not token:
         raise RuntimeError("El EDR no contiene endpoint o token de autorización")
 
-    try:
-        response = requests.get(
-            endpoint,
-            headers={"Authorization": token},
-            timeout=30,
-        )
-    except requests.RequestException as exc:
-        raise HttpRequestError("GET", endpoint, message=str(exc)) from exc
+    last_error = None
+    for candidate in public_endpoint_candidates(endpoint):
+        try:
+            response = requests.get(
+                candidate,
+                headers={"Authorization": token},
+                timeout=30,
+            )
+        except requests.RequestException as exc:
+            last_error = HttpRequestError("GET", candidate, message=str(exc))
+            continue
 
-    if not 200 <= response.status_code < 300:
-        raise HttpRequestError("GET", endpoint, response.status_code, response.text)
+        if not 200 <= response.status_code < 300:
+            last_error = HttpRequestError("GET", candidate, response.status_code, response.text)
+            continue
 
-    try:
-        body = response.json()
-    except ValueError:
-        body = {"raw": response.text}
+        try:
+            body = response.json()
+        except ValueError:
+            body = {"raw": response.text}
 
-    return {
-        "endpoint": endpoint,
-        "status_code": response.status_code,
-        "body": body,
-    }
+        return {
+            "endpoint": candidate,
+            "status_code": response.status_code,
+            "body": body,
+        }
+
+    if last_error:
+        raise last_error
+    raise HttpRequestError("GET", endpoint, message="No hay endpoints candidatos para la descarga")
 
 
 def reset_manual_state():
@@ -635,10 +668,12 @@ def show_http_error(prefix: str, error: Exception):
     st.session_state.manual_error = str(error)
     st.error(prefix)
     if isinstance(error, HttpRequestError):
-        st.caption("La operacion no se pudo completar. Revisa el detalle de la respuesta.")
+        st.caption(f"URL efectiva: `{error.url}`")
+        if error.status_code:
+            st.caption(f"HTTP status: `{error.status_code}`")
         if error.body:
             with st.expander("Detalle de la respuesta", expanded=False):
-                st.write("El servicio devolvio una respuesta de error gestionada por la UI.")
+                st.code(error.body, language="text")
     else:
         with st.expander("Detalle técnico", expanded=False):
             st.code(str(error), language="text")

@@ -2,10 +2,15 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 import json
+import os
 import re
+import sys
 
 import requests
 import streamlit as st
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import common as ui_common
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -16,7 +21,7 @@ EVENTS_FILE = GENERATED_DIR / "ui-events.jsonl"
 PROVIDERS = {
     "customs": {
         "label": "Customs",
-        "management_url": "http://localhost:19193/management",
+        "management_url": os.getenv("CUSTOMS_MANAGEMENT_URL", "http://localhost:19193/management"),
         "api_key": "provider-api-key",
         "default_asset_id": "asset-clearance-mscu7654321",
         "default_contract_definition_id": "contract-clearance-mscu7654321",
@@ -27,7 +32,7 @@ PROVIDERS = {
     },
     "health": {
         "label": "Health",
-        "management_url": "http://localhost:21193/management",
+        "management_url": os.getenv("HEALTH_MANAGEMENT_URL", "http://localhost:21193/management"),
         "api_key": "provider-api-key",
         "default_asset_id": "asset-health-clearance-mscu7654321",
         "default_contract_definition_id": "contract-health-clearance-mscu7654321",
@@ -38,7 +43,7 @@ PROVIDERS = {
     },
     "civilguard": {
         "label": "CivilGuard",
-        "management_url": "http://localhost:22193/management",
+        "management_url": os.getenv("CIVILGUARD_MANAGEMENT_URL", "http://localhost:22193/management"),
         "api_key": "provider-api-key",
         "default_asset_id": "asset-civilguard-clearance-mscu7654321",
         "default_contract_definition_id": "contract-civilguard-clearance-mscu7654321",
@@ -80,30 +85,36 @@ def request_json(method: str, url: str, api_key: str | None = None, json_body=No
     if api_key:
         headers["X-API-Key"] = api_key
 
-    try:
-        response = requests.request(method, url, headers=headers, json=json_body, timeout=timeout)
-    except requests.RequestException as exc:
-        raise HttpRequestError(method, url, message=str(exc)) from exc
-
-    body_text = response.text
-    body = {}
-    if body_text:
+    last_error = None
+    for candidate in ui_common.normalize_url_candidates(url):
         try:
-            body = response.json()
-        except ValueError:
-            body = body_text
+            response = requests.request(method, candidate, headers=headers, json=json_body, timeout=timeout)
+        except requests.RequestException as exc:
+            last_error = HttpRequestError(method, candidate, message=str(exc))
+            continue
 
-    result = {
-        "status_code": response.status_code,
-        "url": url,
-        "method": method,
-        "body": body,
-    }
+        body_text = response.text
+        body = {}
+        if body_text:
+            try:
+                body = response.json()
+            except ValueError:
+                body = body_text
 
-    if not 200 <= response.status_code < 300:
-        raise HttpRequestError(method, url, response.status_code, body_text)
+        result = {
+            "status_code": response.status_code,
+            "url": candidate,
+            "method": method,
+            "body": body,
+        }
 
-    return result
+        if 200 <= response.status_code < 300:
+            return result
+        last_error = HttpRequestError(method, candidate, response.status_code, body_text)
+
+    if last_error:
+        raise last_error
+    raise HttpRequestError(method, url, message="No hay URLs candidatas para la peticion")
 
 
 def friendly_error_message(exc: HttpRequestError, resource: str, action: str) -> str:
@@ -201,7 +212,7 @@ def write_ui_event(step: str, status: str, message: str, provider: str = "", dat
 
 
 def normalize_backend_url_for_host(url: str) -> str:
-    return url.replace("http://regulatory-clearance-api:8081", "http://localhost:8081", 1)
+    return url
 
 
 def normalize_container_id(container_id: str) -> str:

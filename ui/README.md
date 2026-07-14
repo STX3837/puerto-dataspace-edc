@@ -17,10 +17,67 @@ python -m pip install -r .\ui\requirements.txt
 python -m streamlit run .\ui\app.py
 ```
 
+## Ejecucion con Docker
+
+La UI puede ejecutarse como contenedor usando el modo servicio:
+
+```powershell
+.\scripts\service-start.ps1
+```
+
+O manualmente:
+
+```powershell
+docker compose -f .\docker-compose.infra.yml -f .\docker-compose.edc.yml -f .\docker-compose.service.yml up -d --build ui
+```
+
+La aplicacion queda disponible en:
+
+```text
+http://localhost:8501
+```
+
+Si el puerto `8501` ya esta ocupado, cambia `UI_PORT` en `.env`, por ejemplo
+`UI_PORT=8502`.
+
+## Botones de ejecucion con orquestador
+
+Cuando la UI corre en Docker, los botones que ejecutan scripts requieren la API
+orquestadora local.
+
+Terminal 1:
+
+```powershell
+.\scripts\orchestrator-start.ps1 -Background
+```
+
+Terminal 2:
+
+```powershell
+.\scripts\service-start.ps1
+```
+
+Abrir:
+
+```text
+http://localhost:8501
+```
+
+Si `8501` esta ocupado, configurar `UI_PORT` en `.env`.
+
+## Compatibilidad local/Docker
+
+Las paginas `Manual Provider Flow` y `Provider Provisioning` adaptan las URLs
+automaticamente para funcionar tanto en local como desde Docker.
+Los helpers compartidos están en `ui/common.py`.
+
 ## Botones disponibles
 
-- **Ejecutar demo completa**: ejecuta `start-edc-and-smoke-three-providers.ps1`.
-- **Arrancar EDC sin smoke**: ejecuta `start-edc-three-providers.ps1`.
+- **Ejecutar demo completa**: ejecuta `start-edc-and-smoke-three-providers.ps1`
+  mediante el orquestador local cuando la UI corre en Docker.
+- **Arrancar EDC sin smoke**: ejecuta `scripts/edc-start.ps1` mediante el
+  orquestador local cuando la UI corre en Docker. En modo local equivale a
+  preparar el entorno con `start-edc-three-providers.ps1`.
 - **Ejecutar solo smoke test**: ejecuta `smoke-test-three-providers.ps1`.
 - **Abrir flujo manual por Provider**: abre una página para ejecutar paso a paso
   catálogo, selección de oferta, negociación, transferencia, EDR y descarga.
@@ -30,7 +87,8 @@ python -m streamlit run .\ui\app.py
 
 La UI bloquea los botones mientras haya una ejecución activa para evitar scripts
 solapados. Al lanzar una ejecución desde la UI se reinician los eventos y
-artefactos monitorizados.
+artefactos monitorizados. El dashboard muestra la tabla de runs del orquestador,
+pero no muestra el log completo del run en pantalla.
 
 ## Qué muestra
 
@@ -68,7 +126,8 @@ desplegable para copiarlos completos. El `asset id` de negociación y el campo
 `authority` descargado se muestran completos.
 
 Antes de usarla, la infraestructura y los servicios EDC deben estar levantados.
-Puedes prepararlo con **Arrancar EDC sin smoke** o desde consola:
+Puedes prepararlo con **Arrancar EDC sin smoke** desde la UI Docker, o desde
+consola con el flujo local:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\start-edc-three-providers.ps1

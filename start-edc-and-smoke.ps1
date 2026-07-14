@@ -178,6 +178,16 @@ docker compose -f docker-compose.edc.yml up -d `
   consumer-identityhub-postgres provider-identityhub-postgres issuer-postgres `
   consumer-identityhub provider-identityhub issuer-service
 
+if ($LASTEXITCODE -ne 0) {
+  throw "No se pudo arrancar la infraestructura EDC"
+}
+
+docker compose -f docker-compose.edc.yml up -d --build --force-recreate mock-api
+
+if ($LASTEXITCODE -ne 0) {
+  throw "No se pudo construir o arrancar la Mock API"
+}
+
 Wait-HttpReady "http://localhost:7280/api/check/readiness" "Consumer Identity Hub"
 Wait-HttpReady "http://localhost:7180/api/check/readiness" "Provider Identity Hub"
 Wait-HttpReady "http://localhost:10010/api/check/readiness" "Issuer Service"
