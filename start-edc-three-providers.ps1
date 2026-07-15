@@ -51,7 +51,26 @@ function Write-UiEvent {
     data = $Data
   }
 
-  $event | ConvertTo-Json -Depth 20 -Compress | Add-Content -Encoding UTF8 $eventPath
+  $line = ($event | ConvertTo-Json -Depth 20 -Compress) + [Environment]::NewLine
+  $encoding = New-Object System.Text.UTF8Encoding $false
+
+  for ($attempt = 1; $attempt -le 5; $attempt++) {
+    try {
+      $stream = [System.IO.File]::Open($eventPath, [System.IO.FileMode]::Append, [System.IO.FileAccess]::Write, [System.IO.FileShare]::ReadWrite)
+      try {
+        $bytes = $encoding.GetBytes($line)
+        $stream.Write($bytes, 0, $bytes.Length)
+      }
+      finally {
+        $stream.Dispose()
+      }
+      return
+    }
+    catch {
+      if ($attempt -eq 5) { throw }
+      Start-Sleep -Milliseconds 100
+    }
+  }
 }
 
 $uiEventsPath = Join-Path $GENERATED "ui-events.jsonl"
