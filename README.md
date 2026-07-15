@@ -12,7 +12,7 @@ Compose. Este modo levanta infraestructura, stack EDC y la UI Streamlit.
 ### Arranque
 
 ```powershell
-.\scripts\service-start.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\service-start.ps1
 ```
 
 Equivalente manual:
@@ -43,20 +43,20 @@ flujo desde sus botones.
 ### Estado
 
 ```powershell
-.\scripts\service-status.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\service-status.ps1
 ```
 
 ### Logs
 
 ```powershell
-.\scripts\service-logs.ps1 ui
-.\scripts\service-logs.ps1 consumer-controlplane
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\service-logs.ps1 ui
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\service-logs.ps1 consumer-controlplane
 ```
 
 ### Parada
 
 ```powershell
-.\scripts\service-stop.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\service-stop.ps1
 ```
 
 Este comando conserva volumenes. No usar `down -v` salvo que se quiera borrar
@@ -79,14 +79,14 @@ El código, README y dependencias de esta API estan en `orchestrator_api/`.
 ### Arranque recomendado
 
 ```powershell
-.\scripts\orchestrator-start.ps1 -Background
-.\scripts\service-start.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\orchestrator-start.ps1 -Background
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\service-start.ps1
 ```
 
 Tambien puedes arrancar el orquestador en primer plano en una terminal separada:
 
 ```powershell
-.\scripts\orchestrator-start.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\orchestrator-start.ps1
 ```
 
 ### Conflicto con Vault
@@ -97,7 +97,7 @@ a arrancar:
 ```powershell
 docker stop vault
 docker rm vault
-.\scripts\service-start.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\service-start.ps1
 ```
 
 No uses `docker compose down -v` salvo que quieras borrar volumenes.
@@ -440,14 +440,13 @@ Instalación:
 
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r .\ui\requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r .\ui\requirements.txt
 ```
 
 Ejecución:
 
 ```powershell
-python -m streamlit run .\ui\app.py
+.\.venv\Scripts\python.exe -m streamlit run .\ui\app.py
 ```
 
 La interfaz ofrece estas acciones:

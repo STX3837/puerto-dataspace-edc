@@ -9,6 +9,7 @@ $POLICY_TRANSPORT_COMPANY_VALID_ORDER = Join-Path $RESOURCES "policies\policy-tr
 $CONTRACT_DEMO = Join-Path $RESOURCES "contracts\contract-clearance-mscu7654321.json"
 $CONSUMER_MEMBERSHIP_REQUEST = Join-Path $RESOURCES "identity\consumer-membership-request.json"
 $PROVIDER_MEMBERSHIP_REQUEST = Join-Path $RESOURCES "identity\provider-membership-request.json"
+$IDENTITYHUB_SCHEMA = Join-Path $RESOURCES "identity\identityhub-schema.sql"
 $SMOKE_TEST = Join-Path $PSScriptRoot "smoke-test-edc.ps1"
 
 function Wait-HttpReady($url, $name, $attempts = 30) {
@@ -27,6 +28,49 @@ function Wait-HttpReady($url, $name, $attempts = 30) {
     }
 
     Start-Sleep -Seconds 2
+  }
+}
+
+function Wait-PostgresTableReady($container, $table, $user = "identityhub", $database = "identityhub", $attempts = 45) {
+  for ($i = 1; $i -le $attempts; $i++) {
+    $result = docker exec $container psql `
+      -U $user `
+      -d $database `
+      -t `
+      -A `
+      -c "select to_regclass('public.$table') is not null;"
+
+    if ($LASTEXITCODE -eq 0 -and $result.Trim() -eq "t") {
+      Write-Host "$container esquema disponible ($table)"
+      return
+    }
+
+    Start-Sleep -Seconds 2
+  }
+
+  throw "La tabla $table no esta disponible en $container despues de $attempts intentos"
+}
+
+function Wait-PostgresReady($container, $user = "identityhub", $database = "identityhub", $attempts = 30) {
+  for ($i = 1; $i -le $attempts; $i++) {
+    docker exec $container pg_isready -U $user -d $database | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+      Write-Host "$container disponible"
+      return
+    }
+
+    Start-Sleep -Seconds 2
+  }
+
+  throw "$container no esta disponible despues de $attempts intentos"
+}
+
+function Initialize-IdentityHubSchema($databaseContainer) {
+  Get-Content -LiteralPath $IDENTITYHUB_SCHEMA -Raw |
+    docker exec -i $databaseContainer psql -U identityhub -d identityhub | Out-Null
+
+  if ($LASTEXITCODE -ne 0) {
+    throw "No se pudo inicializar el esquema de IdentityHub en $databaseContainer"
   }
 }
 
@@ -182,6 +226,11 @@ if ($LASTEXITCODE -ne 0) {
   throw "No se pudo arrancar la infraestructura EDC"
 }
 
+Wait-PostgresReady "consumer-identityhub-postgres"
+Wait-PostgresReady "provider-identityhub-postgres"
+Initialize-IdentityHubSchema "consumer-identityhub-postgres"
+Initialize-IdentityHubSchema "provider-identityhub-postgres"
+
 docker compose -f docker-compose.edc.yml up -d --build --force-recreate mock-api
 
 if ($LASTEXITCODE -ne 0) {
@@ -191,6 +240,9 @@ if ($LASTEXITCODE -ne 0) {
 Wait-HttpReady "http://localhost:7280/api/check/readiness" "Consumer Identity Hub"
 Wait-HttpReady "http://localhost:7180/api/check/readiness" "Provider Identity Hub"
 Wait-HttpReady "http://localhost:10010/api/check/readiness" "Issuer Service"
+Wait-PostgresTableReady "consumer-identityhub-postgres" "edc_holder_credentialrequest"
+Wait-PostgresTableReady "provider-identityhub-postgres" "edc_holder_credentialrequest"
+Wait-HttpReady "http://localhost:8080/realms/logistics-dataspace" "Keycloak realm"
 
 Write-Host "2) Activando participantes y provisionando MembershipCredentials..."
 

@@ -371,7 +371,8 @@ def render_orchestrator_panel(available: bool, runs: list[dict]):
         st.caption("No hay ejecuciones registradas todavía.")
         return
 
-    st.markdown("#### Últimos runs")
+    st.markdown("#### Últimos 5 runs")
+    latest_runs = runs[:5]
     st.dataframe(
         [
             {
@@ -382,7 +383,7 @@ def render_orchestrator_panel(available: bool, runs: list[dict]):
                 "inicio": run.get("started_at", ""),
                 "fin": run.get("finished_at", ""),
             }
-            for run in runs[:10]
+            for run in latest_runs
         ],
         use_container_width=True,
         hide_index=True,

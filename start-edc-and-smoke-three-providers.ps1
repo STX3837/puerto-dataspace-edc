@@ -7,10 +7,14 @@ $POLICY_ALLOW_USE = Join-Path $RESOURCES "policies\policy-allow-use.json"
 $POLICY_TRANSPORT_COMPANY_VALID_ORDER = Join-Path $RESOURCES "policies\policy-transport-company-valid-order.json"
 $CONSUMER_MEMBERSHIP_REQUEST = Join-Path $RESOURCES "identity\consumer-membership-request.json"
 $CONSUMER_TRANSPORT_COMPANY_REQUEST = Join-Path $RESOURCES "identity\consumer-transportcompany-request.json"
+$MEMBERSHIP_CREDENTIAL_DEFINITION = Join-Path $RESOURCES "identity\membership-credential-definition.json"
+$MEMBERSHIP_ATTESTATION = Join-Path $RESOURCES "identity\membership-attestation.json"
 $TRANSPORT_COMPANY_CREDENTIAL_DEFINITION = Join-Path $RESOURCES "identity\transport-company-credential-definition.json"
 $TRANSPORT_COMPANY_ATTESTATION = Join-Path $RESOURCES "identity\transport-company-attestation.json"
+$CONSUMER_HOLDER = Join-Path $RESOURCES "identity\consumer-holder-did.json"
 $CONSUMER_PARTICIPANT = Join-Path $RESOURCES "identity\consumer-participant-recreate.json"
 $ISSUER_PARTICIPANT = Join-Path $RESOURCES "identity\issuer-participant.json"
+$IDENTITYHUB_SCHEMA = Join-Path $RESOURCES "identity\identityhub-schema.sql"
 $SMOKE_TEST = Join-Path $PSScriptRoot "smoke-test-three-providers.ps1"
 $GENERATED = Join-Path $RESOURCES "generated"
 New-Item -ItemType Directory -Path $GENERATED -Force | Out-Null
@@ -64,6 +68,7 @@ $providers = @(
     IdentityApi = "http://localhost:7181/api/identity"
     ParticipantContextId = "regulatory-clearance-provider"
     Participant = Join-Path $RESOURCES "identity\provider-participant.json"
+    Holder = Join-Path $RESOURCES "identity\provider-holder-did.json"
     Database = "provider-identityhub-postgres"
     MembershipRequest = Join-Path $RESOURCES "identity\provider-membership-request.json"
     ManagementApi = "http://localhost:19193/management"
@@ -78,6 +83,7 @@ $providers = @(
     IdentityApi = "http://localhost:7381/api/identity"
     ParticipantContextId = "health"
     Participant = Join-Path $RESOURCES "identity\health-participant.json"
+    Holder = Join-Path $RESOURCES "identity\health-holder-did.json"
     Database = "health-identityhub-postgres"
     MembershipRequest = Join-Path $RESOURCES "identity\health-membership-request.json"
     ManagementApi = "http://localhost:21193/management"
@@ -92,6 +98,7 @@ $providers = @(
     IdentityApi = "http://localhost:7481/api/identity"
     ParticipantContextId = "civilguard"
     Participant = Join-Path $RESOURCES "identity\civilguard-participant.json"
+    Holder = Join-Path $RESOURCES "identity\civilguard-holder-did.json"
     Database = "civilguard-identityhub-postgres"
     MembershipRequest = Join-Path $RESOURCES "identity\civilguard-membership-request.json"
     ManagementApi = "http://localhost:22193/management"
@@ -147,6 +154,35 @@ function Wait-ContainerHttpReady($container, $url, $name, $attempts = 45) {
   }
 
   throw "$name no esta disponible despues de $attempts intentos: $url"
+}
+
+function Wait-PostgresTableReady($container, $table, $user = "identityhub", $database = "identityhub", $attempts = 45) {
+  for ($i = 1; $i -le $attempts; $i++) {
+    $result = docker exec $container psql `
+      -U $user `
+      -d $database `
+      -t `
+      -A `
+      -c "select to_regclass('public.$table') is not null;"
+
+    if ($LASTEXITCODE -eq 0 -and $result.Trim() -eq "t") {
+      Write-Host "$container esquema disponible ($table)"
+      return
+    }
+
+    Start-Sleep -Seconds 2
+  }
+
+  throw "La tabla $table no esta disponible en $container despues de $attempts intentos"
+}
+
+function Initialize-IdentityHubSchema($databaseContainer) {
+  Get-Content -LiteralPath $IDENTITYHUB_SCHEMA -Raw |
+    docker exec -i $databaseContainer psql -U identityhub -d identityhub | Out-Null
+
+  if ($LASTEXITCODE -ne 0) {
+    throw "No se pudo inicializar el esquema de IdentityHub en $databaseContainer"
+  }
 }
 
 function Set-ParticipantActive($identityApi, $participantContextId, $token) {
@@ -251,25 +287,24 @@ function Clear-IssuerCredentialState {
   }
 }
 
-function Ensure-TransportCompanyCredentialDefinition($token) {
-  $definitionId = "transport-company-credential-def"
-  $definitionUrl = "http://localhost:10013/api/admin/v1beta/participants/issuer/credentialdefinitions/$definitionId"
-
+function Ensure-IssuerHolder($token, $holderFile) {
   try {
     Invoke-WebRequest `
       -UseBasicParsing `
       -Method Post `
-      -Uri "http://localhost:10013/api/admin/v1beta/participants/issuer/attestations" `
+      -Uri "http://localhost:10013/api/admin/v1beta/participants/issuer/holders" `
       -Headers @{ Authorization = "Bearer $token" } `
       -ContentType "application/json" `
-      -InFile $TRANSPORT_COMPANY_ATTESTATION | Out-Null
+      -InFile $holderFile | Out-Null
   }
   catch {
     if ($_.Exception.Response.StatusCode.value__ -ne 409) {
       throw
     }
   }
+}
 
+function Ensure-TransportCompanyHolder($token) {
   $holderPayload = @{
     holderId = "did:web:consumer-identityhub%3A7083:consumer"
     did = "did:web:consumer-identityhub%3A7083:consumer"
@@ -295,6 +330,60 @@ function Ensure-TransportCompanyCredentialDefinition($token) {
       throw
     }
   }
+}
+
+function Ensure-MembershipCredentialDefinition($token) {
+  try {
+    Invoke-WebRequest `
+      -UseBasicParsing `
+      -Method Post `
+      -Uri "http://localhost:10013/api/admin/v1beta/participants/issuer/attestations" `
+      -Headers @{ Authorization = "Bearer $token" } `
+      -ContentType "application/json" `
+      -InFile $MEMBERSHIP_ATTESTATION | Out-Null
+  }
+  catch {
+    if ($_.Exception.Response.StatusCode.value__ -ne 409) {
+      throw
+    }
+  }
+
+  try {
+    Invoke-WebRequest `
+      -UseBasicParsing `
+      -Method Post `
+      -Uri "http://localhost:10013/api/admin/v1beta/participants/issuer/credentialdefinitions" `
+      -Headers @{ Authorization = "Bearer $token" } `
+      -ContentType "application/json" `
+      -InFile $MEMBERSHIP_CREDENTIAL_DEFINITION | Out-Null
+  }
+  catch {
+    if ($_.Exception.Response.StatusCode.value__ -ne 409) {
+      throw
+    }
+  }
+}
+
+function Ensure-TransportCompanyCredentialDefinition($token) {
+  $definitionId = "transport-company-credential-def"
+  $definitionUrl = "http://localhost:10013/api/admin/v1beta/participants/issuer/credentialdefinitions/$definitionId"
+
+  try {
+    Invoke-WebRequest `
+      -UseBasicParsing `
+      -Method Post `
+      -Uri "http://localhost:10013/api/admin/v1beta/participants/issuer/attestations" `
+      -Headers @{ Authorization = "Bearer $token" } `
+      -ContentType "application/json" `
+      -InFile $TRANSPORT_COMPANY_ATTESTATION | Out-Null
+  }
+  catch {
+    if ($_.Exception.Response.StatusCode.value__ -ne 409) {
+      throw
+    }
+  }
+
+  Ensure-TransportCompanyHolder $token
 
   try {
     Invoke-WebRequest `
@@ -594,6 +683,10 @@ Wait-PostgresReady "provider-identityhub-postgres"
 Wait-PostgresReady "health-identityhub-postgres"
 Wait-PostgresReady "civilguard-identityhub-postgres"
 Wait-PostgresReady "issuer-postgres" "issuer" "issuerservice"
+Initialize-IdentityHubSchema "consumer-identityhub-postgres"
+Initialize-IdentityHubSchema "provider-identityhub-postgres"
+Initialize-IdentityHubSchema "health-identityhub-postgres"
+Initialize-IdentityHubSchema "civilguard-identityhub-postgres"
 Write-UiEvent -Step "infra_check" -Status "SUCCESS" -Message "Infraestructura base disponible"
 
 docker compose -f docker-compose.edc.yml up -d `
@@ -614,7 +707,13 @@ Write-UiEvent -Step "issuer_ready" -Status "SUCCESS" -Message "IssuerService dis
 foreach ($provider in $providers) {
   Wait-HttpReady $provider.IdentityReadiness "$($provider.Name) Identity Hub"
 }
+Wait-PostgresTableReady "consumer-identityhub-postgres" "edc_holder_credentialrequest"
+foreach ($provider in $providers) {
+  Wait-PostgresTableReady $provider.Database "edc_holder_credentialrequest"
+}
 Write-UiEvent -Step "identityhubs_ready" -Status "SUCCESS" -Message "IdentityHubs disponibles"
+
+Wait-HttpReady "http://localhost:8080/realms/logistics-dataspace" "Keycloak realm"
 
 Write-Host "2) Activando participantes y provisionando MembershipCredentials..."
 
@@ -721,6 +820,13 @@ foreach ($provider in $providers) {
     $identityToken
 }
 Write-UiEvent -Step "participants_activation" -Status "SUCCESS" -Message "Participantes activados"
+
+Ensure-IssuerHolder $issuerAdminToken $CONSUMER_HOLDER
+Ensure-TransportCompanyHolder $issuerAdminToken
+foreach ($provider in $providers) {
+  Ensure-IssuerHolder $issuerAdminToken $provider.Holder
+}
+Ensure-MembershipCredentialDefinition $issuerAdminToken
 
 Write-UiEvent -Step "membership_credentials" -Status "RUNNING" -Message "Comprobando/emitiendo MembershipCredential"
 Ensure-MembershipCredential `
