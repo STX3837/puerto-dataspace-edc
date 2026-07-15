@@ -1,6 +1,16 @@
--- Postgres schema required by the prebuilt IdentityHub runtime.
--- The statements mirror the SQL resources packaged in /app/app.jar and are
--- intentionally idempotent so demo runs can bootstrap empty databases.
+--
+--  Copyright (c) 2024 Bayerische Motoren Werke Aktiengesellschaft (BMW AG)
+--
+--  This program and the accompanying materials are made available under the
+--  terms of the Apache License, Version 2.0 which is available at
+--  https://www.apache.org/licenses/LICENSE-2.0
+--
+--  SPDX-License-Identifier: Apache-2.0
+--
+--  Contributors:
+--       Bayerische Motoren Werke Aktiengesellschaft (BMW AG) - initial API and implementation
+--
+--
 
 CREATE TABLE IF NOT EXISTS edc_lease
 (
