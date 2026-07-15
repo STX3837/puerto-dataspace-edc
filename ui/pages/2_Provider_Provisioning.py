@@ -720,6 +720,7 @@ def handle_operation(provider_key: str, resource: str, action: str, operation, *
             "data": result,
         }
         save_json(generated_response_path(provider_key, resource), result)
+        refresh_inventory_after_operation(provider_key, provider, resource, action)
         write_ui_event(event_step, "SUCCESS", action_success_message(resource, action), provider_key, result)
     except HttpRequestError as exc:
         message = friendly_error_message(exc, resource, action)
@@ -847,6 +848,26 @@ def load_backend_inventory(provider_key: str, provider: dict):
             "backend",
             "get",
         )
+
+
+def refresh_inventory_after_operation(provider_key: str, provider: dict, resource: str, action: str):
+    if action not in {"create", "update", "delete"}:
+        return
+
+    if resource == "asset":
+        load_provider_inventory(provider_key, provider, "asset", list_assets)
+        load_backend_inventory(provider_key, provider)
+        st.session_state.pop(field_key(provider_key, "contract_asset_id_select"), None)
+        st.session_state.pop(field_key(provider_key, "validation_asset_id"), None)
+        st.session_state.pop(field_key(provider_key, "validation_backend_url"), None)
+    elif resource == "policy":
+        load_provider_inventory(provider_key, provider, "policy", list_policies)
+        st.session_state.pop(field_key(provider_key, "access_policy_id_select"), None)
+        st.session_state.pop(field_key(provider_key, "contract_policy_id_select"), None)
+        st.session_state.pop(field_key(provider_key, "validation_policy_id"), None)
+    elif resource == "contract_definition":
+        load_provider_inventory(provider_key, provider, "contract_definition", list_contract_definitions)
+        st.session_state.pop(field_key(provider_key, "validation_contract_definition_id"), None)
 
 
 def options_with_fallback(options: list[str], *fallbacks: str) -> list[str]:
