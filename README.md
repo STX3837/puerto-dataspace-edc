@@ -89,6 +89,12 @@ Tambien puedes arrancar el orquestador en primer plano en una terminal separada:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\orchestrator-start.ps1
 ```
 
+### Parada del orquestador
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\orchestrator-stop.ps1
+```
+
 ### Conflicto con Vault
 
 Si Docker indica que ya existe un contenedor `vault`, libera ese nombre y vuelve
