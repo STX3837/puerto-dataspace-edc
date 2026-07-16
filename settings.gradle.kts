@@ -14,22 +14,11 @@
 
 rootProject.name = "template"
 
-// this is needed to have access to snapshot builds of plugins
 pluginManagement {
     repositories {
         mavenLocal()
         mavenCentral()
         gradlePluginPortal()
-        maven {
-            url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
-            content {
-                includeGroupByRegex("org\\.eclipse\\.edc(\\..*)?")
-                includeVersionByRegex(".*", ".*", ".*-SNAPSHOT")
-            }
-            mavenContent {
-                snapshotsOnly()
-            }
-        }
     }
 }
 
@@ -38,16 +27,6 @@ dependencyResolutionManagement {
     repositories {
         mavenLocal()
         mavenCentral()
-        maven {
-            url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
-            content {
-                includeGroupByRegex("org\\.eclipse\\.edc(\\..*)?")
-                includeVersionByRegex(".*", ".*", ".*-SNAPSHOT")
-            }
-            mavenContent {
-                snapshotsOnly()
-            }
-        }
     }
 }
 
