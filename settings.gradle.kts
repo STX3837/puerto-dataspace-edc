@@ -18,21 +18,34 @@ rootProject.name = "template"
 pluginManagement {
     repositories {
         mavenLocal()
-        maven {
-            url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
-        }
         mavenCentral()
         gradlePluginPortal()
+        maven {
+            url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
+            content {
+                includeVersionByRegex(".*", ".*", ".*-SNAPSHOT")
+            }
+            mavenContent {
+                snapshotsOnly()
+            }
+        }
     }
 }
 
 dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
         mavenLocal()
+        mavenCentral()
         maven {
             url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
+            content {
+                includeVersionByRegex(".*", ".*", ".*-SNAPSHOT")
+            }
+            mavenContent {
+                snapshotsOnly()
+            }
         }
-        mavenCentral()
     }
 }
 
