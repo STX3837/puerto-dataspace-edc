@@ -23,6 +23,7 @@ pluginManagement {
         maven {
             url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
             content {
+                includeGroupByRegex("org\\.eclipse\\.edc(\\..*)?")
                 includeVersionByRegex(".*", ".*", ".*-SNAPSHOT")
             }
             mavenContent {
@@ -40,6 +41,7 @@ dependencyResolutionManagement {
         maven {
             url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
             content {
+                includeGroupByRegex("org\\.eclipse\\.edc(\\..*)?")
                 includeVersionByRegex(".*", ".*", ".*-SNAPSHOT")
             }
             mavenContent {
